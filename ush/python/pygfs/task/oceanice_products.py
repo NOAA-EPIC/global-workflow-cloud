@@ -155,7 +155,7 @@ class OceanIceProducts(Task):
 
     @staticmethod
     @logit(logger)
-    def execute(config: Dict, product_grid: str) -> None:
+    def execute(config: Dict, product_grid: str, run_with_container=False) -> None:
         """Run the ocnicepost.x executable to interpolate and convert to grib2
 
         Parameters
@@ -172,7 +172,8 @@ class OceanIceProducts(Task):
 
         # Run the ocnicepost.x executable if interpolated variables are wanted
         if config.oceanice_yaml.ocnicepost.namelist.write_netcdf or config.oceanice_yaml.ocnicepost.namelist.write_grib2:
-            OceanIceProducts.interp(config.DATA, config.APRUN_OCNICEPOST, exec_name="ocnicepost.x")
+            OceanIceProducts.interp(config.DATA, config.APRUN_OCNICEPOST,
+                                    exec_name="ocnicepost.x", run_with_container=run_with_container)
 
         if config.oceanice_yaml.ocnicepost.namelist.write_grib2:
             # Index the interpolated grib2 file
@@ -180,7 +181,7 @@ class OceanIceProducts(Task):
 
     @staticmethod
     @logit(logger)
-    def interp(workdir: str, aprun_cmd: str, exec_name: str = "ocnicepost.x") -> None:
+    def interp(workdir: str, aprun_cmd: str, exec_name: str = "ocnicepost.x", run_with_container=False) -> None:
         """
         Run the interpolation executable to generate interpolated file
 
@@ -202,7 +203,10 @@ class OceanIceProducts(Task):
         os.chdir(workdir)
         logger.debug(f"Current working directory: {os.getcwd()}")
 
-        exec_cmd = Executable(aprun_cmd)
+        if run_with_container:
+            exec_cmd = Executable('time')
+        else:
+            exec_cmd = Executable(aprun_cmd)
         exec_cmd.add_default_arg(os.path.join(workdir, exec_name))
         try:
             exec_cmd()

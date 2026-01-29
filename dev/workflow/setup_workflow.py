@@ -36,6 +36,8 @@ def input_args(*argv):
                         type=str, default=os.environ['PWD'])
     parser.add_argument('--force', help='raise warnings instead of errors when possible',
                         action='store_true', dest="force")
+    parser.add_argument('--rocotorun', help='rocotorun fullpath', type=str,
+                        default=None, required=False)
 
     # Create subparsers for workflow engines
     subparsers = parser.add_subparsers(dest='workflow', required=True,
@@ -53,6 +55,8 @@ def input_args(*argv):
                                default=25, required=False)
     rocoto_parser.add_argument('--verbosity', help='verbosity level of Rocoto', type=int,
                                default=10, required=False)
+    rocoto_parser.add_argument('--rocotorun', help='rocotorun fullpath', type=str,
+                               default=None, required=False)
 
     # EcFlow subparser
     ecflow_parser = subparsers.add_parser('ecflow',
@@ -134,6 +138,7 @@ def main(*argv):
         workflow_config.cyclethrottle = user_inputs.cyclethrottle
         workflow_config.taskthrottle = user_inputs.taskthrottle
         workflow_config.verbosity = user_inputs.verbosity
+        workflow_config.rocotorun = user_inputs.rocotorun
     elif workflow_engine == "ecflow":
         workflow_config.verbosity = user_inputs.verbosity
 

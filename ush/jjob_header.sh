@@ -115,3 +115,5 @@ export err=$?
 if [[ ${err} -ne 0 ]]; then
     err_exit "[${BASH_SOURCE[0]}]: Error while sourcing machine environment ${machine}.env for job ${env_job}"
 fi
+
+source "${HOMEgfs}/env/CONTAINER.env"

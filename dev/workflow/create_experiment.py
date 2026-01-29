@@ -76,6 +76,8 @@ def input_args():
         '-o', '--overwrite', help='overwrite previously created experiment', action="store_true", required=False)
     parser.add_argument('--force', help='raise warnings instead of errors when possible',
                         action='store_true', dest="force")
+    parser.add_argument('-r', '--rocotorun', help='rocotorun fullpath',
+                        default=None, required=False)
 
     return parser.parse_args()
 
@@ -130,6 +132,10 @@ if __name__ == '__main__':
 
     if user_inputs.force:
         setup_workflow_args.append("--force")
+
+    if user_inputs.rocotorun is not None:
+        setup_workflow_args.append("--rocotorun")
+        setup_workflow_args.append(user_inputs.rocotorun)
 
     logger.info(f"Call: setup_workflow.main()")
     logger.debug(f"setup_workflow.py {' '.join(setup_workflow_args)}")

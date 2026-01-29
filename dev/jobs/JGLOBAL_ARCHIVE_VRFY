@@ -29,8 +29,9 @@ fi
 ###############################################################
 # Run archive script
 ###############################################################
-
-${GLOBALARCHIVESH:-${SCRgfs}/exglobal_archive_vrfy.py}
+GLOBALARCHIVESH=${GLOBALARCHIVESH:-${SCRgfs}/exglobal_archive_vrfy.py}
+# shellcheck disable=2086
+"${PYCMD:-python}" "${GLOBALARCHIVESH}" ${PYEXTRAARGS:-}
 err=$?
 if [[ ${err} -ne 0 ]]; then
     exit "${err}"

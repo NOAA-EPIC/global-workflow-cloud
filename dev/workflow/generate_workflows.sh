@@ -68,8 +68,12 @@ function _usage() {
        If this option is not specified, then the existing email address in
        the crontab will be preserved.
 
+    -r specify rocotorun fullpath (mainly work with container)
+
     -t Add a 'tag' to the end of the case names in the pslots to distinguish
        pslots between multiple sets of tests.
+
+    -R Run with Container
 
     -v Verbose mode.  Prints output of all commands to stdout.
 
@@ -97,11 +101,14 @@ _specified_yaml_dir=false
 _run_all_gfs=false
 _run_all_gefs=false
 _run_all_sfs=false
+_run_with_container=false
 _run_all_gcafs=false
 _hpc_account=""
 _set_account=false
 _update_cron=false
 _email=""
+_has_rocotorun=false
+_rocotorun_fullpath=""
 _tag=""
 _set_email=false
 _verbose=false
@@ -114,10 +121,10 @@ _auto_del=false
 _nonflag_option_count=0
 
 while [[ $# -gt 0 && "$1" != "--" ]]; do
-    while getopts ":H:bBDuy:Y:GESCA:ce:t:vVdh" option; do
+    while getopts ":H:bBDuy:Y:GESCA:ce:t:r:vVdhR" option; do
         case "${option}" in
             H)
-                HOMEgfs="${OPTARG}"
+                export HOMEgfs="${OPTARG}"
                 _specified_home=true
                 if [[ ! -d "${HOMEgfs}" ]]; then
                     echo "Specified HOMEgfs directory (${HOMEgfs}) does not exist"
@@ -146,6 +153,8 @@ while [[ $# -gt 0 && "$1" != "--" ]]; do
             t) _tag="_${OPTARG}" ;;
             v) _verbose=true ;;
             V) _very_verbose=true && _verbose=true && _verbose_flag="-v" ;;
+            R) _run_with_container=true ;;
+            r) _rocotorun_fullpath="${OPTARG}" && _has_rocotorun=true ;;
             A) _set_account=true && _hpc_account="${OPTARG}" ;;
             d) _debug=true && _very_verbose=true && _verbose=true && _verbose_flag="-v" && PS4='${LINENO}: ' ;;
             h) _usage && exit 0 ;;
@@ -270,10 +279,14 @@ fi
 # Set HOMEgfs if it wasn't set by the user
 if [[ "${_specified_home}" == "false" ]]; then
     script_relpath="$(dirname "${BASH_SOURCE[0]}")"
-    HOMEgfs="$(cd "${script_relpath}" && git rev-parse --show-toplevel)"
+    export HOMEgfs="$(cd "${script_relpath}" && git rev-parse --show-toplevel)"
     if [[ "${_verbose}" == "true" ]]; then
         printf "Setting HOMEgfs to %s\n\n" "${HOMEgfs}"
     fi
+fi
+
+if [[ "${_verbose}" == "true" ]]; then
+    echo "_run_with_container: ${_run_with_container}"
 fi
 
 # Set the _yaml_dir to HOMEgfs/dev/ci/cases/pr if not explicitly set
@@ -524,12 +537,32 @@ echo "Running create_experiment.py for ${#_yaml_list[@]} cases"
 if [[ "${_verbose}" == true ]]; then
     printf "Selected cases: %s\n\n" "${_yaml_list[*]}"
 fi
+
 for _case in "${_yaml_list[@]}"; do
     if [[ "${_verbose}" == false ]]; then
         echo "${_case}"
     fi
     _pslot="${_case}${_tag}"
-    _create_exp_cmd="./create_experiment.py -y ${_yaml_dir}/${_case}.yaml --overwrite"
+    if [[ "${_run_with_container}" == "true" ]]; then
+        lowercas_machine="${machine,,}"
+        UPPERCASE_MACHINE="${machine^^}"
+        ln -sf ${HOMEgfs}/env/CONTAINER4${lowercas_machine} ${HOMEgfs}/env/CONTAINER.env
+        source ${HOMEgfs}/env/CONTAINER.env
+        if [[ -f ${HOMEgfs}/dev/container/${lowercas_machine}.env/${UPPERCASE_MACHINE}.env ]]; then
+             cp ${HOMEgfs}/dev/container/${lowercas_machine}.env/${UPPERCASE_MACHINE}.env \
+                 ${HOMEgfs}/env/${UPPERCASE_MACHINE}.env
+        fi
+        if [[ "${_has_rocotorun}" == "true" ]]; then
+            _create_exp_cmd="${HOMEgfs}/dev/container/prefix/container_python.sh ./create_experiment.py \
+                -y ${_yaml_dir}/${_case}.yaml -r ${_rocotorun_fullpath} --overwrite"
+        else
+            _create_exp_cmd="${HOMEgfs}/dev/container/prefix/container_python.sh ./create_experiment.py \
+                -y ${_yaml_dir}/${_case}.yaml --overwrite"
+        fi
+    else
+        ln -sf ${HOMEgfs}/env/CONTAINER4host ${HOMEgfs}/env/CONTAINER.env
+        _create_exp_cmd="./create_experiment.py -y ${_yaml_dir}/${_case}.yaml --overwrite"
+    fi
     if [[ "${_verbose}" == true ]]; then
         pslot=${_pslot} RUNTESTS=${_runtests} ${_create_exp_cmd}
     else
@@ -648,6 +681,7 @@ if [[ "${_debug}" == "false" ]]; then
     rm -f final.cron existing.cron tests.cron "${_verbose_flag}"
 fi
 
+unset HOMEgfs
 echo "Success!!"
 if [[ "${_set_email}" == true && "${_debug}" == "true" ]]; then
     final_message=$'Success!\n'"${final_message:-}"

@@ -74,8 +74,13 @@ HOMEgfs=$(cd "${script_dir}" && git rev-parse --show-toplevel)
 # Needs to be exported for gw_setup.sh
 export HOMEgfs
 
-echo "Sourcing global-workflow modules ..."
-source "${HOMEgfs}/dev/ush/gw_setup.sh"
+if [[ -v SINGULARITY_CONTAINER ]]; then
+    source ${HOMEgfs}/dev/container/env/python-env.sh
+else
+    echo "Sourcing global-workflow modules ..."
+    source "${HOMEgfs}/dev/ush/gw_setup.sh"
+fi
+
 
 # Un-export after gw_setup.sh
 export -n HOMEgfs
@@ -260,7 +265,7 @@ if [[ "${compute_build}" != "YES" ]]; then
                 builds_in_progress=false
             else
                 builds_in_progress=true
-            fi
+	    fi
         fi
 
         # Move the cursor up nback lines before printing the build status again
