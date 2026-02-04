@@ -30,6 +30,16 @@ elif [[ ${MACHINE_ID} = gaea* ]]; then
     HPC_ACCOUNT=bil-fire8
 
     rocotocmd=/autofs/ncrc-svm1_home2/Christopher.W.Harrop/rocoto-1.3.7/bin/rocotorun
+elif [[ ${MACHINE_ID} = hercules* ]]; then
+    module load singularity
+    CONTAINER_SIF="/work2/noaa/epic/weihuang/containers/${sif}"
+    CONTAINER_BINDINGS="-B /work -B /work2"
+    rundir="/work2/noaa/epic/weihuang/run/prefix"
+    HPC_ACCOUNT=epic
+
+    module load contrib/0.1
+    module load rocoto/1.3.7
+    rocotocmd=$(command -v rocotorun)
 elif [[ ${MACHINE_ID} = noaacloud* ]]; then
     rundir="/lustre/${USER}/run"
     HPC_ACCOUNT="${USER}"
@@ -47,12 +57,16 @@ cd "${HOMEDIR}/dev/workflow" || exit 1
 if [[ "${run_with_container}" == "YES" ]]; then
     CONTAINER_OPTIONS="-R -r \"${rocotocmd}\""
 
-    ln -sf ${MACHINE_ID}.env env
-    ln -sf ${MACHINE_ID}.prefix prefix
-    cp ${HOMEgfs}/env/CONTAINER4${MACHINE_ID} ${HOMEgfs}/env/CONTAINER.env
+    ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env ${HOMEgfs}/dev/container/env
+    ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${HOMEgfs}/dev/container/prefix
+    cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${HOMEgfs}/env/CONTAINER.env
+    UMID="${MACHINE_ID^^}"
+    if [[ -f ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
+        cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${HOMEgfs}/env/${UMID}.env
+    fi
     source ${HOMEgfs}/env/CONTAINER.env
 else
-    CONTAINER_OPTIONS=""
+    CONTAINER_OPTIONS=" "
 fi
 
 RUNTESTS="${rundir}" \

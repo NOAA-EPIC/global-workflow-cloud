@@ -5,9 +5,13 @@ set -x
 HOMEgfs="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." > /dev/null 2>&1 && pwd)"
 source "${HOMEgfs}/ush/detect_machine.sh"
 
-ln -sf ${MACHINE_ID}.env env
-ln -sf ${MACHINE_ID}.prefix prefix
-cp ${HOMEgfs}/env/CONTAINER4${MACHINE_ID} ${HOMEgfs}/env/CONTAINER.env
+ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env ${HOMEgfs}/dev/container/env
+ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${HOMEgfs}/dev/container/prefix
+cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${HOMEgfs}/env/CONTAINER.env
+UMID="${MACHINE_ID^^}"
+if [[ -f ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
+    cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${HOMEgfs}/env/${UMID}.env
+fi
 source ${HOMEgfs}/env/CONTAINER.env
 
 # shellcheck disable=SC2086

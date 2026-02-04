@@ -64,16 +64,22 @@ INFO: The proc_num corresponds to the line in '${mpmd_cmdfile}'
 EOF
 
 if [[ -v SINGULARITY_CONTAINER ]]; then
-    # Redirect output from each process to its own stdout
-    # Read the incoming cmdfile and create mpiexec usable cmdfile
+  # # Redirect output from each process to its own stdout
+  # # Read the incoming cmdfile and create mpiexec usable cmdfile
     nm=0
     # shellcheck disable=SC2312
     while IFS= read -r line; do
-        echo "Line ${nm}: ${line}"
         ${line} > "mpmd.${nm}.out" &
         ((nm = nm + 1))
     done < "${cmdfile}"
     wait
+
+  # while IFS= read -r line; do
+  #     echo "-n 1 ${line}" >> "${mpmd_cmdfile}"
+  #     ((nm = nm + 1))
+  # done < "${cmdfile}"
+
+  # mpiexec --app "${mpmd_cmdfile}"
     err=$?
 
 elif [[ "${launcher:-}" =~ ^srun.* ]]; then #  srun-based system e.g. Hera, Orion, etc.
@@ -129,7 +135,9 @@ if [[ ${err} -eq 0 ]]; then
         } >> mpmd.out
         rm -f "${file}"
     done
-    cat mpmd.out
+    if [[ -f mpmd.out ]]; then
+        cat mpmd.out
+    fi
 fi
 
 exit "${err}"
