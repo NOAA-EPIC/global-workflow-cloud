@@ -13,13 +13,15 @@ EXEC_NAME="gfs_model.x"
 # Valid only for WCOSS2; enable parallel restart I/O
 # TODO: Remove this option when ufs-weather-model#2716 is fixed
 PARALLEL_RESTART="NO"
+COMPILER="Intel"
 
-while getopts ":da:fj:e:pvwy" option; do
+while getopts ":da:fjc:e:pvwy" option; do
     case "${option}" in
         d) BUILD_TYPE="DEBUG" ;;
         a) APP="${OPTARG}" ;;
         f) FASTER="ON" ;;
         j) BUILD_JOBS="${OPTARG}" ;;
+        c) COMPILER="${OPTARG}" ;;
         v) export BUILD_VERBOSE="YES" ;;
         w) PDLIB="OFF" ;;
         y) HYDRO="ON" ;;
@@ -36,6 +38,7 @@ done
 
 cd "${HOMEgfs_}/sorc/ufs_model.fd"
 
+export COMPILER=${COMPILER,,}
 source "${HOMEgfs_}/ush/detect_machine.sh"
 source "${HOMEgfs_}/sorc/ufs_model.fd/tests/module-setup.sh"
 
@@ -97,7 +100,7 @@ if [[ "${MACHINE_ID}" == "wcoss2" && "${PARALLEL_RESTART}" == "NO" ]]; then
         rm -rf "${BUILD_DIR}"
     fi
 else
-    BUILD_JOBS=${BUILD_JOBS:-8} "${HOMEgfs_}/sorc/ufs_model.fd/tests/compile.sh" "${MACHINE_ID}" "${MAKE_OPT}" "${COMPILE_ID}" "intel" "${CLEAN_BEFORE}" "${CLEAN_AFTER}"
+    BUILD_JOBS=${BUILD_JOBS:-8} "${HOMEgfs_}/sorc/ufs_model.fd/tests/compile.sh" "${MACHINE_ID}" "${MAKE_OPT}" "${COMPILE_ID}" "${COMPILER}" "${CLEAN_BEFORE}" "${CLEAN_AFTER}"
 fi
 mv "./tests/fv3_${COMPILE_ID}.exe" "./tests/${EXEC_NAME}"
 if [[ ! -f "./tests/modules.ufs_model.lua" ]]; then mv "./tests/modules.fv3_${COMPILE_ID}.lua" "./tests/modules.ufs_model.lua"; fi

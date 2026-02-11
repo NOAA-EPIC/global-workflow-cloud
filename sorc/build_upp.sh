@@ -9,11 +9,16 @@ cd "${script_dir}" || exit 1
 
 OPTIND=1
 _opts=""
-while getopts ":dj:v" option; do
+_compiler="intel"
+while getopts ":djc:v" option; do
     case "${option}" in
         d) _opts+="-d " ;;
         j) BUILD_JOBS="${OPTARG}" ;;
         v) _opts+="-v " ;;
+        c) 
+	    _compiler=${OPTARG,,}
+	    _opts+="-c ${_compiler}"
+	    ;;
         :)
             echo "[${BASH_SOURCE[0]}]: ${option} requires an argument"
             ;;
@@ -24,6 +29,7 @@ while getopts ":dj:v" option; do
 done
 shift $((OPTIND - 1))
 
+export COMPILER=${_compiler,,}
 source "${HOMEgfs_}/ush/detect_machine.sh"
 
 cd "${HOMEgfs_}/sorc/ufs_model.fd/UFSATM/upp/tests"

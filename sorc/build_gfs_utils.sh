@@ -19,11 +19,12 @@ EOF
 }
 
 OPTIND=1
-while getopts ":j:dvh" option; do
+while getopts ":jc:dvh" option; do
     case "${option}" in
         d) BUILD_TYPE="Debug" ;;
         v) BUILD_VERBOSE="YES" ;;
         j) BUILD_JOBS="${OPTARG}" ;;
+        c) COMPILER="${OPTARG}" ;;
         h)
             usage
             ;;
@@ -47,6 +48,7 @@ source "${HOMEgfs_}/ush/detect_machine.sh"
 BUILD_TYPE=${BUILD_TYPE:-"Release"} \
     BUILD_VERBOSE=${BUILD_VERBOSE:-"NO"} \
     BUILD_JOBS=${BUILD_JOBS:-8} \
+    COMPILER=${COMPILER:-Intel} \
     "${HOMEgfs_}/sorc/gfs_utils.fd/ush/build.sh"
 
 exit

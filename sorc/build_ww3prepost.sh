@@ -8,10 +8,12 @@ cd "${HOMEgfs_}/sorc" || exit 1
 # Default settings
 PDLIB="ON"
 
-while getopts ":j:a:dvw" option; do
+COMPILER="intel"
+while getopts ":jc:a:dvw" option; do
     case "${option}" in
         d) BUILD_TYPE="Debug" ;;
         j) BUILD_JOBS="${OPTARG}" ;;
+        c) COMPILER="${OPTARG}" ;;
         v) export BUILD_VERBOSE="YES" ;;
         w) PDLIB="OFF" ;;
         :)
@@ -25,10 +27,12 @@ done
 
 # Determine machine and load modules
 source "${HOMEgfs_}/ush/detect_machine.sh"
+COMPILER=${COMPILER,,}
+declare -x COMPILER
 set +x
 source "${HOMEgfs_}/sorc/ufs_model.fd/tests/module-setup.sh"
 module use "${HOMEgfs_}/sorc/ufs_model.fd/modulefiles"
-module load "ufs_${MACHINE_ID}.intel"
+module load "ufs_${MACHINE_ID}.${COMPILER}"
 set -x
 
 #Set WW3 directory

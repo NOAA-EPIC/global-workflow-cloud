@@ -5,11 +5,12 @@ set -eux
 readonly HOMEgfs_=$(cd "$(dirname "$(readlink -f -n "${BASH_SOURCE[0]}")")" && git rev-parse --show-toplevel)
 
 OPTIND=1
-while getopts ":j:dv" option; do
+while getopts ":jc:dv" option; do
     case "${option}" in
         d) BUILD_TYPE="Debug" ;;
         j) BUILD_JOBS="${OPTARG}" ;;
         v) BUILD_VERBOSE="YES" ;;
+        c) COMPILER="${OPTARG}" ;;
         :)
             echo "[${BASH_SOURCE[0]}]: ${option} requires an argument"
             ;;
@@ -23,6 +24,7 @@ shift $((OPTIND - 1))
 source "${HOMEgfs_}/ush/detect_machine.sh"
 
 CMAKE_OPTS="-DGFS=ON" \
+    COMPILER=${COMPILER:-intel} \
     BUILD_TYPE=${BUILD_TYPE:-"Release"} \
     BUILD_JOBS=${BUILD_JOBS:-8} \
     BUILD_VERBOSE=${BUILD_VERBOSE:-} \
