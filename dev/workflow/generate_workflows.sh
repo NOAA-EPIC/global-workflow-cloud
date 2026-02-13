@@ -22,7 +22,7 @@ function _usage() {
     -B Run build_all.sh -c with default flags [-c triggers build on compute nodes]
        (build the UFS, UPP, UFS_Utils, and GFS-utils only on compute nodes)
 
-    -u Update submodules before building and/or generating experiments.
+    -s Update submodules before building and/or generating experiments.
 
     -y "list of YAMLs to run"
        If this option is not specified, the default case (C48_ATM) will be
@@ -57,12 +57,14 @@ function _usage() {
        \$HOMEgfs/dev/ci/platform/config.\$machine
        will be used.
 
-    -c Append the chosen set of tests to your existing crontab
+    -u Append the chosen set of tests to your existing crontab
        If this option is not chosen, the new entries that would have been
        written to your crontab will be printed to stdout.
        NOTES:
           - For Orion/Hercules, this option will not work unless run on
             the [orion|hercules]-login-1 head node.
+
+    -c select compiler (Intel or GNU).
 
     -e "your@email.com" Email address to place in the crontab.
        If this option is not specified, then the existing email address in
@@ -119,9 +121,10 @@ _cwd=$(pwd)
 _runtests="${RUNTESTS:-${_runtests:-}}"
 _auto_del=false
 _nonflag_option_count=0
+_compiler="Intel"
 
 while [[ $# -gt 0 && "$1" != "--" ]]; do
-    while getopts ":H:bBDuy:Y:GESCA:ce:t:r:vVdhR" option; do
+    while getopts ":H:bBDsuy:Y:GESCA:c:e:t:r:vVdhR" option; do
         case "${option}" in
             H)
                 export HOMEgfs="${OPTARG}"
@@ -134,7 +137,7 @@ while [[ $# -gt 0 && "$1" != "--" ]]; do
             b) _build=true ;;
             B) _build=true && _compute_build=true ;;
             D) _auto_del=true ;;
-            u) _update_submods=true ;;
+            s) _update_submods=true ;;
             y) # Start over with an empty _yaml_list
                 declare -a _yaml_list=()
                 for _yaml in ${OPTARG}; do
@@ -148,7 +151,8 @@ while [[ $# -gt 0 && "$1" != "--" ]]; do
             E) _run_all_gefs=true ;;
             S) _run_all_sfs=true ;;
             C) _run_all_gcafs=true ;;
-            c) _update_cron=true ;;
+            u) _update_cron=true ;;
+            c) _compiler="${OPTARG}" ;;
             e) _email="${OPTARG}" && _set_email=true ;;
             t) _tag="_${OPTARG}" ;;
             v) _verbose=true ;;
@@ -186,6 +190,8 @@ while [[ $# -gt 0 && "$1" != "--" ]]; do
         shift
     done
 done
+
+compiler=${_compiler,,}
 
 function send_email() {
     # Send an email to $_email.
@@ -298,7 +304,7 @@ if [[ "${_specified_home}" == "false" ]]; then
 fi
 
 if [[ "${_verbose}" == "true" ]]; then
-    echo "_run_with_container: ${_run_with_container}"
+    echo "run_with_container: ${_run_with_container}"
 fi
 
 # Set the _yaml_dir to HOMEgfs/dev/ci/cases/pr if not explicitly set
@@ -556,12 +562,12 @@ for _case in "${_yaml_list[@]}"; do
     fi
     _pslot="${_case}${_tag}"
     if [[ "${_run_with_container}" == "true" ]]; then
-        ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env ${HOMEgfs}/dev/container/env
-        ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${HOMEgfs}/dev/container/prefix
-        ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${HOMEgfs}/env/CONTAINER.env
+        ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/env ${HOMEgfs}/dev/container/env
+        ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/prefix ${HOMEgfs}/dev/container/prefix
+        ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/env/CONTAINER.env ${HOMEgfs}/env/CONTAINER.env
         UMID="${MACHINE_ID^^}"
-        if [[ -f ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
-            cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${HOMEgfs}/env/${UMID}.env
+        if [[ -f ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/env/${UMID}.env ]]; then
+            cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/env/${UMID}.env ${HOMEgfs}/env/${UMID}.env
         fi
         source ${HOMEgfs}/env/CONTAINER.env
         if [[ "${_has_rocotorun}" == "true" ]]; then

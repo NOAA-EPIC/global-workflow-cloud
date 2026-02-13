@@ -17,10 +17,57 @@ yamllist="C48_S2SW"
 #casetype=hires
 #yamllist="C768_S2SW"
 
+function _usage() {
+    cat << EOF
+   This script automates the experiment setup process for the global workflow.
+   Options are also available to update submodules, build the workflow (with
+   specific build flags), specify which YAMLs and YAML directory to run, and
+   whether to automatically update your crontab.
+
+   Usage: gen-run-cases.sh [OPTIONS]
+       NOTES on -C -c:
+           - Both the way to select compiler: Intel, or GNU
+
+       -C Select a COMPILER: Available compilers are: Intel, GNU
+       -c Select a compiler: Available compilers are: Intel, GNU
+       -v Verbose mode.  Prints output of all commands to stdout.
+       -h Display this message.
+EOF
+}
+
+_verbose=false
+_compiler="Intel"
+
+while [[ $# -gt 0 && "$1" != "--" ]]; do
+    while getopts ":Cc:vh" option; do
+        case "${option}" in
+            C) _compiler="${OPTARG}" ;;
+            c) _compiler="${OPTARG}" ;;
+            v) _verbose=true ;;
+            h) _usage && exit 0 ;;
+            :)
+                echo "[${BASH_SOURCE[0]}]: ${option} requires an argument"
+                _usage
+                exit 1
+                ;;
+            *)
+                echo "[${BASH_SOURCE[0]}]: Unrecognized option: ${option}"
+                _usage
+                exit 1
+                ;;
+        esac
+    done
+
+    if [[ ${OPTIND:-0} -gt 0 ]]; then
+        shift $((OPTIND - 1))
+    fi
+done
+
+compiler="${_compiler,,}"
+
 HOMEDIR=${HOMEgfs}
-img=ubuntu22.04-intel-ufs-env-v1.9.2.img
 if [[ ${MACHINE_ID} = ursa* ]]; then
-    rundir="/scratch3/NAGAPE/epic/${USER}/run/prefix"
+    rundir="/scratch3/NAGAPE/epic/${USER}/run/gnu"
     HPC_ACCOUNT=epic
 
     module load rocoto/1.3.7
@@ -32,8 +79,6 @@ elif [[ ${MACHINE_ID} = gaea* ]]; then
     rocotocmd=/autofs/ncrc-svm1_home2/Christopher.W.Harrop/rocoto-1.3.7/bin/rocotorun
 elif [[ ${MACHINE_ID} = hercules* ]]; then
     module load singularity
-    CONTAINER_SIF="/work2/noaa/epic/weihuang/containers/${sif}"
-    CONTAINER_BINDINGS="-B /work -B /work2"
     rundir="/work2/noaa/epic/weihuang/run/prefix"
     HPC_ACCOUNT=epic
 
@@ -55,14 +100,14 @@ mkdir -p "${rundir}"
 cd "${HOMEDIR}/dev/workflow" || exit 1
 
 if [[ "${run_with_container}" == "YES" ]]; then
-    CONTAINER_OPTIONS="-R -r \"${rocotocmd}\""
+    CONTAINER_OPTIONS="-R -r \"${rocotocmd}\" -c ${compiler}"
 
-    ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env ${HOMEgfs}/dev/container/env
-    ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${HOMEgfs}/dev/container/prefix
-    cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${HOMEgfs}/env/CONTAINER.env
+    ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/env ${HOMEgfs}/dev/container/env
+    ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/prefix ${HOMEgfs}/dev/container/prefix
+    cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/env/CONTAINER.env ${HOMEgfs}/env/CONTAINER.env
     UMID="${MACHINE_ID^^}"
-    if [[ -f ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
-        cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${HOMEgfs}/env/${UMID}.env
+    if [[ -f ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/env/${UMID}.env ]]; then
+        cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/${compiler}/env/${UMID}.env ${HOMEgfs}/env/${UMID}.env
     fi
     source ${HOMEgfs}/env/CONTAINER.env
 else

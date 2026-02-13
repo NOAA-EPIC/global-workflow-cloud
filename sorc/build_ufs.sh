@@ -13,7 +13,7 @@ EXEC_NAME="gfs_model.x"
 # Valid only for WCOSS2; enable parallel restart I/O
 # TODO: Remove this option when ufs-weather-model#2716 is fixed
 PARALLEL_RESTART="NO"
-COMPILER="Intel"
+_COMPILER=${COMPILER:-"Intel"}
 
 while getopts ":da:fjc:e:pvwy" option; do
     case "${option}" in
@@ -21,7 +21,7 @@ while getopts ":da:fjc:e:pvwy" option; do
         a) APP="${OPTARG}" ;;
         f) FASTER="ON" ;;
         j) BUILD_JOBS="${OPTARG}" ;;
-        c) COMPILER="${OPTARG}" ;;
+        c) _COMPILER="${OPTARG}" ;;
         v) export BUILD_VERBOSE="YES" ;;
         w) PDLIB="OFF" ;;
         y) HYDRO="ON" ;;
