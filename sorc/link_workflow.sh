@@ -74,8 +74,9 @@ case "${machine}" in
     "hera" | "ursa") FIX_DIR="/scratch3/NCEPDEV/global/role.glopara/fix" ;;
     "orion") FIX_DIR="/work2/noaa/global/role-global/fix" ;;
     "hercules") FIX_DIR="/work2/noaa/global/role-global/fix" ;;
-    "gaeac5") FIX_DIR="/gpfs/f5/ufs-ard/world-shared/global/glopara/data/fix" ;;
     "gaeac6") FIX_DIR="/gpfs/f6/drsa-precip3/world-shared/role.glopara/fix" ;;
+    "stampede3") FIX_DIR="/work2/11244/huangwei/stampede3/data/fix" ;;
+    "container") FIX_DIR="/work2/11244/huangwei/stampede3/data/fix" ;;
     "noaacloud") FIX_DIR="/contrib/global-workflow-shared-data/fix" ;;
     #"noaacloud") FIX_DIR="/lustre/fix" ;;
     *)
@@ -96,6 +97,15 @@ for package in "${packages[@]}"; do
     fi
     ${LINK} "${HOMEgfs}/sorc/gdas.cd/sorc/${package}/src/${package}" .
 done
+
+# Link wxflow to ush/python
+cd "${HOMEgfs}/ush/python" || exit 1
+if [[ -d "${HOMEgfs}/sorc/wxflow/src/wxflow" ]]; then
+    if [[ -s "wxflow" ]]; then
+        rm -f "wxflow"
+    fi
+    ${LINK} "${HOMEgfs}/sorc/wxflow/src/wxflow" .
+fi
 
 # Link fix directories
 if [[ -n "${FIX_DIR}" ]]; then
