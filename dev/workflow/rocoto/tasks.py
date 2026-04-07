@@ -18,7 +18,7 @@ class Tasks:
                    'prep_sfc', 'prep', 'anal', 'sfcanl', 'analcalc', 'analdiag', 'arch_vrfy', 'arch_tars', 'cleanup',
                    'ecen_fv3jedi', 'analcalc_fv3jedi', 'cleanup',
                    'atmanlinit', 'atmanlvar', 'atmanlfv3inc', 'atmanlfinal',
-                   'prep_emissions', 'prepoceanobs',
+                   'prep_emissions', 'prepoceanobs', 'prepatmanlbias',
                    'marineanlinit', 'marineanlletkf', 'marinebmatinit', 'marinebmat', 'marineanlvar',
                    'marineanlecen', 'marineanlchkpt', 'marineanlfinal', 'ocnanalvrfy',
                    'eobs', 'epos', 'esfc', 'eupd',
@@ -55,10 +55,7 @@ class Tasks:
         # Save base in the internal state (never know where it may be needed)
         self._base = self._configs['base']
 
-        if 'HOMEgfs' in os.environ:
-            self.HOMEgfs = os.getenv('HOMEgfs')
-        else:
-            self.HOMEgfs = self._base['HOMEgfs']
+        self.HOMEglobal = self._base['HOMEglobal']
         self.rotdir = self._base['ROTDIR']
         self.pslot = self._base['PSLOT']
         if self.run == "enkfgfs":
@@ -71,7 +68,7 @@ class Tasks:
         # DATAROOT is set by prod_envir in ops.  Here, we use `STMP` to construct DATAROOT
         dataroot_str = f"{self._base.get('STMP')}/RUNDIRS/{self._base.get('PSLOT')}/{self.run}.<cyclestr>@Y@m@d@H</cyclestr>"
         envar_dict = {'RUN_ENVIR': self._base.get('RUN_ENVIR', 'emc'),
-                      'HOMEgfs': self.HOMEgfs,
+                      'HOMEglobal': self.HOMEglobal,
                       'EXPDIR': self._base.get('EXPDIR'),
                       'NET': self._base.get('NET'),
                       'RUN': self.run,
