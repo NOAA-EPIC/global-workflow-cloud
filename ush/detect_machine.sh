@@ -29,9 +29,6 @@ case $(hostname -f) in
     dlogin0[1-9].dogwood.wcoss2.ncep.noaa.gov) MACHINE_ID=wcoss2 ;; ### dogwood01-9
     dlogin10.dogwood.wcoss2.ncep.noaa.gov) MACHINE_ID=wcoss2 ;;     ### dogwood10
 
-    gaea5[1-8]) MACHINE_ID=gaeac5 ;;          ### gaea51-58
-    gaea5[1-8].ncrc.gov) MACHINE_ID=gaeac5 ;; ### gaea51-58
-
     gaea6[1-8]) MACHINE_ID=gaeac6 ;;          ### gaea61-68
     gaea6[1-8].ncrc.gov) MACHINE_ID=gaeac6 ;; ### gaea61-68
 
@@ -43,6 +40,8 @@ case $(hostname -f) in
     ufe1[0-6]) MACHINE_ID=ursa ;; ### ursa10-16
     uecflow01) MACHINE_ID=ursa ;; ### ursaecflow01
 
+    *.stampede3.tacc.utexas.edu) MACHINE_ID=stampede3 ;; ### stampede3
+
     s4-submit.ssec.wisc.edu) MACHINE_ID=s4 ;; ### s4
 
     fe[1-8]) MACHINE_ID=jet ;; ### jet01-8
@@ -53,6 +52,8 @@ case $(hostname -f) in
     [Hh]ercules-login-[1-4].[Hh][Pp][Cc].[Mm]s[Ss]tate.[Ee]du) MACHINE_ID=hercules ;; ### hercules1-4
 
     login[1-4].stampede2.tacc.utexas.edu) MACHINE_ID=stampede ;; ### stampede1-4
+
+    login[1-6].stampede3.tacc.utexas.edu) MACHINE_ID=stampede3 ;; ### stampede1-6
 
     login0[1-2].expanse.sdsc.edu) MACHINE_ID=expanse ;; ### expanse1-2
 
@@ -96,6 +97,9 @@ elif [[ -d /scratch3 ]]; then
     else # Assume we are on the GitHub runners, which mock Hera
         MACHINE_ID=hera
     fi
+elif [[ -d /home1 ]]; then
+    # We are on TACC's stampede3
+    MACHINE_ID=stampede3
 elif [[ -d /work ]]; then
     # We are on MSU Orion or Hercules
     mount=$(findmnt -n -o SOURCE /home)
@@ -104,9 +108,6 @@ elif [[ -d /work ]]; then
     else
         MACHINE_ID=orion
     fi
-elif [[ -d /gpfs/f5 ]]; then
-    # We are on GAEAC5.
-    MACHINE_ID=gaeac5
 elif [[ -d /gpfs/f6 ]]; then
     # We are on GAEAC6.
     MACHINE_ID=gaeac6

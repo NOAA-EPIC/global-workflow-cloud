@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+set -x
 ###
 function _usage() {
     cat << EOF
@@ -85,8 +85,10 @@ function _usage() {
 EOF
 }
 
-set -eu
+#set -eu
+set -x
 
+echo "$0 part 0"
 # Set default options
 HOMEgfs=""
 _specified_home=false
@@ -120,6 +122,9 @@ _runtests="${RUNTESTS:-${_runtests:-}}"
 _auto_del=false
 _nonflag_option_count=0
 
+echo "$0 part 1"
+echo "RUNTESTS: ${RUNTESTS}"
+echo "_runtests: ${_runtests}"
 while [[ $# -gt 0 && "$1" != "--" ]]; do
     while getopts ":H:bBDuy:Y:GESCA:ce:t:r:vVdhR" option; do
         case "${option}" in
@@ -176,7 +181,7 @@ while [[ $# -gt 0 && "$1" != "--" ]]; do
     fi
 
     while [[ $# -gt 0 && ! "$1" =~ ^- ]]; do
-        _runtests=${1}
+      # _runtests=${1}
         ((_nonflag_option_count += 1))
         if [[ ${_nonflag_option_count} -gt 1 ]]; then
             echo "Too many arguments specified."
@@ -187,6 +192,7 @@ while [[ $# -gt 0 && "$1" != "--" ]]; do
     done
 done
 
+echo "$0 part 2"
 function send_email() {
     # Send an email to $_email.
     # Only use this once we get to the long steps (building, etc) and on success.
@@ -208,6 +214,7 @@ if [[ "${_set_email}" == "true" && -n "${_email}" ]]; then
     export REPLYTO="${_email}"
 fi
 
+echo "$0 part 3"
 function delete_dir() {
     local dir_to_rm="${1:-}"
     if [[ -z "${dir_to_rm}" ]]; then
@@ -235,6 +242,8 @@ function delete_dir() {
     done
 }
 
+echo "_runtests: ${_runtests}"
+
 if [[ -z "${_runtests}" ]]; then
     echo "Missing run directory (RUNTESTS) argument/environment variable."
     sleep 2
@@ -247,13 +256,19 @@ if [[ "${_debug}" == "true" ]]; then
     set -x
 fi
 
+echo "$0 part 4"
 # Create the RUNTESTS directory
 # Start by getting the full path
+echo "_runtests: ${_runtests}"
 _runtests="$(realpath "${_runtests}")"
+echo "_runtests: ${_runtests}"
 if [[ "${_verbose}" == "true" ]]; then
     printf "Creating RUNTESTS in %s\n\n" "${_runtests}"
 fi
+echo "$0 part 4.1"
+echo "_runtests: ${_runtests}"
 if [[ ! -d "${_runtests}" ]]; then
+echo "$0 part 4.2"
     set +e
     if ! mkdir -p "${_runtests}" "${_verbose_flag}"; then
         echo "Unable to create RUNTESTS directory: ${_runtests}"
@@ -262,6 +277,7 @@ if [[ ! -d "${_runtests}" ]]; then
     fi
     set -e
 else
+echo "$0 part 4.3"
     echo "The RUNTESTS directory ${_runtests} already exists."
     if [[ "${_auto_del}" == "true" ]]; then
         echo "Removing."
@@ -271,6 +287,7 @@ else
     fi
 fi
 
+echo "$0 part 5"
 # Empty the _yaml_list array if -G, -E, -S and/or -C were selected
 if [[ "${_run_all_gfs}" == "true" ||
     "${_run_all_gefs}" == "true" ||
@@ -288,6 +305,7 @@ if [[ "${_run_all_gfs}" == "true" ||
     _yaml_list=()
 fi
 
+echo "$0 part 6"
 # Set HOMEgfs if it wasn't set by the user
 if [[ "${_specified_home}" == "false" ]]; then
     script_relpath="$(dirname "${BASH_SOURCE[0]}")"
@@ -306,6 +324,7 @@ if [[ "${_specified_yaml_dir}" == false ]]; then
     _yaml_dir="${HOMEgfs}/dev/ci/cases/pr"
 fi
 
+echo "$0 part 7"
 function select_all_yamls() {
     # A helper function to select all of the YAMLs for a specified system (gfs, gefs, sfs)
 
@@ -368,6 +387,7 @@ EOM
     fi
 }
 
+echo "$0 part 8"
 # Check if running all GEFS cases
 if [[ "${_run_all_gefs}" == "true" ]]; then
     # Append -w to build_all.sh flags if -E was specified
@@ -431,6 +451,7 @@ EOM
     fi
 fi
 
+echo "$0 part 9"
 # Loading modules sometimes raises unassigned errors, so disable checks
 set +u
 if [[ "${_verbose}" == "true" ]]; then
@@ -439,11 +460,13 @@ fi
 if [[ "${_debug}" == "true" ]]; then
     set +x
 fi
+echo "$0 part 9.1"
 if ! source "${HOMEgfs}/dev/ush/gw_setup.sh" >&stdout; then
     cat stdout
     echo "Failed to source ${HOMEgfs}/dev/ush/gw_setup.sh!"
     exit 7
 fi
+echo "$0 part 9.2"
 if [[ "${_verbose}" == "true" ]]; then
     cat stdout
 fi
@@ -452,6 +475,7 @@ if [[ "${_debug}" == "true" ]]; then
     set -x
 fi
 set -u
+echo "$0 part 9.3"
 machine=${MACHINE_ID}
 platform_config="${HOMEgfs}/dev/ci/platforms/config.${machine}"
 if [[ -f "${platform_config}" ]]; then
@@ -463,11 +487,13 @@ else
     fi
 fi
 
+echo "$0 part 9.4"
 # If _yaml_dir is not set, set it to $HOMEgfs/dev/ci/cases/pr
 if [[ -z ${_yaml_dir} ]]; then
     _yaml_dir="${HOMEgfs}/dev/ci/cases/pr"
 fi
 
+echo "$0 part 9.5"
 # Build the system if requested
 if [[ "${_build}" == "true" ]]; then
     printf "Building via build_all.sh %s\n\n" "${_build_flags}"
@@ -479,6 +505,7 @@ if [[ "${_build}" == "true" ]]; then
     ${HOMEgfs}/sorc/build_all.sh ${_compute_build_flag:-} ${_verbose_flag} ${_build_flags}
 fi
 
+echo "$0 part 10"
 # Link the workflow silently unless there's an error
 if [[ "${_verbose}" == true ]]; then
     printf "Linking the workflow\n\n"
@@ -542,6 +569,7 @@ if [[ "${_set_account}" == true ]]; then
     fi
 fi
 
+echo "$0 part 11"
 # Create the experiments
 rm -f "tests.cron" "${_verbose_flag}"
 echo "Running create_experiment.py for ${#_yaml_list[@]} cases"
@@ -550,11 +578,15 @@ if [[ "${_verbose}" == true ]]; then
     printf "Selected cases: %s\n\n" "${_yaml_list[*]}"
 fi
 
+echo "$0 part 11.1"
 for _case in "${_yaml_list[@]}"; do
+    echo "case: ${_case}"
     if [[ "${_verbose}" == false ]]; then
         echo "${_case}"
     fi
     _pslot="${_case}${_tag}"
+echo "$0 part 11.2"
+
     if [[ "${_run_with_container}" == "true" ]]; then
         ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env ${HOMEgfs}/dev/container/env
         ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${HOMEgfs}/dev/container/prefix
@@ -575,12 +607,16 @@ for _case in "${_yaml_list[@]}"; do
         ln -sf ${HOMEgfs}/env/CONTAINER4host ${HOMEgfs}/env/CONTAINER.env
         _create_exp_cmd="./create_experiment.py -y ${_yaml_dir}/${_case}.yaml --overwrite"
     fi
+echo "$0 part 11.3"
+    echo "_pslot: ${_pslot}"
+    echo "_runtests: ${_runtests}"
+    echo "_create_exp_cmd: ${_create_exp_cmd}"
     if [[ "${_verbose}" == true ]]; then
         pslot=${_pslot} RUNTESTS=${_runtests} ${_create_exp_cmd}
     else
         if ! pslot=${_pslot} RUNTESTS=${_runtests} ${_create_exp_cmd} 2> stderr 1> stdout; then
             _output=$(cat stdout stderr)
-            _message="The create_experiment command (${_create_exp_cmd}) failed with a non-zero status.  Output:"
+            _message="The create_experiment command ${_create_exp_cmd} failed with a non-zero status.  Output:"
             _message="${_message}"$'\n'"${_output}"
             if [[ "${_set_email}" == true ]]; then
                 send_email "${_message}"
@@ -592,6 +628,7 @@ for _case in "${_yaml_list[@]}"; do
         rm -f stdout stderr
     fi
 
+echo "$0 part 11.4"
     # Check if DATAROOT is already present; eval will return just DATAROOT from the sourcing
     eval "$(
         PDY=0 cyc=0 source "${_runtests}/EXPDIR/${_pslot}/config.base" >&/dev/null
@@ -612,6 +649,7 @@ for _case in "${_yaml_list[@]}"; do
         fi
     fi
 
+echo "$0 part 11.5"
     # Check if this experiment is using cron or scron
     cron_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.crontab"
     scron_sh_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.scron.sh"
@@ -627,6 +665,7 @@ for _case in "${_yaml_list[@]}"; do
         exit 13
     fi
 
+echo "$0 part 11.6"
     if [[ "${_use_scron}" == true ]]; then
         {
             grep "^####" "${cron_file}"
@@ -639,6 +678,8 @@ for _case in "${_yaml_list[@]}"; do
 done
 echo
 
+echo "$0 part 12"
+exit 0
 # Add MAILTO to tests.cron for regular crontab
 if [[ "${_use_scron}" == false ]]; then
     if [[ "${_set_email}" == "true" ]]; then
@@ -653,6 +694,7 @@ if [[ "${_use_scron}" == false ]]; then
     fi
 fi
 
+echo "$0 part 13"
 # Update the cron
 if [[ "${_update_cron}" == "true" ]]; then
     printf "Updating the existing crontab\n\n"
@@ -736,9 +778,11 @@ if [[ "${_debug}" == "false" ]]; then
     rm -f final.cron existing.cron tests.cron "${_verbose_flag}"
 fi
 
+echo "$0 part 14"
 unset HOMEgfs
 echo "Success!!"
-if [[ "${_set_email}" == true && "${_debug}" == "true" ]]; then
-    final_message=$'Success!\n'"${final_message:-}"
-    _subject="generate_workflow.sh completed successfully" send_email "${final_message}"
-fi
+#if [[ "${_set_email}" == true && "${_debug}" == "true" ]]; then
+#    final_message=$'Success!\n'"${final_message:-}"
+#    _subject="generate_workflow.sh completed successfully"
+#    send_email "${final_message}"
+#fi

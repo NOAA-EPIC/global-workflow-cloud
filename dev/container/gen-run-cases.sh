@@ -46,6 +46,18 @@ elif [[ ${MACHINE_ID} = noaacloud* ]]; then
 
     module load rocoto/1.3.7
     rocotocmd=$(command -v rocotorun)
+elif [[ ${MACHINE_ID} = stampede3* ]]; then
+   #rundir=${WORK}/run
+    rundir=/work2/11244/huangwei/stampede3/run
+    HPC_ACCOUNT="TG-EES250186"
+
+    rocotocmd=$(command -v rocotorun)
+elif [[ ${MACHINE_ID} = container* ]]; then
+   #rundir=${WORK}/run
+    rundir=/work2/11244/huangwei/stampede3/run
+    HPC_ACCOUNT="TG-EES250186"
+
+    rocotocmd=$(command -v rocotorun)
 fi
 
 set -x
