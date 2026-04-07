@@ -13,5 +13,7 @@
         -B ${I_MPI_PMI_LIBRARY} \
         ${CONTAINER_BINDINGS} \
         "${CONTAINER_SIF}" \
-        "${HOMEgfs}/dev/container/env/model-env.sh" \
+        "/work2/11244/huangwei/stampede3/src/global-workflow-cloud/dev/container/env/model-env.sh" \
         "$@"
+
+#       "${HOMEglobal}/dev/container/env/model-env.sh" \

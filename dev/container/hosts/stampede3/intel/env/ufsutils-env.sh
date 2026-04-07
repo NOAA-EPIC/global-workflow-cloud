@@ -1,7 +1,8 @@
 #!/bin/bash
 
 source /usr/lmod/lmod/init/bash
-module use "${HOMEgfs}/sorc/ufs_utils.fd/modulefiles"
+#module use "${HOMEglobal}/sorc/ufs_utils.fd/modulefiles"
+module use "/work2/11244/huangwei/stampede3/src/global-workflow-cloud/sorc/ufs_utils.fd/modulefiles"
 module load build.container.intel
 
 if [[ $# -gt 0 ]]; then

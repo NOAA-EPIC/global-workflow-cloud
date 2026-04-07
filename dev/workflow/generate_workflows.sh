@@ -198,7 +198,7 @@ function _parse_option() {
 
 function _parse_args() {
     while [[ $# -gt 0 && "$1" != "--" ]]; do
-        while getopts ":H:bBDuy:Y:GESCA:I:ce:t:vVdh" option; do
+        while getopts ":H:bBDuyr:Y:GESCA:I:ce:t:vVdRh" option; do
             _parse_option
         done
 
@@ -226,7 +226,6 @@ _parse_args "$@"
 # Common Helpers
 # --------------------------------------------------------------------------- #
 
-echo "$0 part 2"
 function send_email() {
     # Send an email to $_email.
     # Only use this once we get to the long steps (building, etc) and on success.
@@ -248,7 +247,6 @@ if [[ "${_set_email}" == "true" && -n "${_email}" ]]; then
     export REPLYTO="${_email}"
 fi
 
-echo "$0 part 3"
 function delete_dir() {
     local dir_to_rm="${1:-}"
     if [[ -z "${dir_to_rm}" ]]; then
@@ -304,10 +302,7 @@ echo "_runtests: ${_runtests}"
 if [[ "${_verbose}" == "true" ]]; then
     printf "Creating RUNTESTS in %s\n\n" "${_runtests}"
 fi
-echo "$0 part 4.1"
-echo "_runtests: ${_runtests}"
 if [[ ! -d "${_runtests}" ]]; then
-echo "$0 part 4.2"
     set +e
     if ! mkdir -p "${_runtests}" "${_verbose_flag}"; then
         echo "Unable to create RUNTESTS directory: ${_runtests}"
@@ -316,7 +311,6 @@ echo "$0 part 4.2"
     fi
     set -e
 else
-echo "$0 part 4.3"
     echo "The RUNTESTS directory ${_runtests} already exists."
     if [[ "${_auto_del}" == "true" ]]; then
         echo "Removing."
@@ -519,7 +513,6 @@ if ! source "${HOMEglobal}/dev/ush/gw_setup.sh" >&stdout; then
     echo "Failed to source ${HOMEglobal}/dev/ush/gw_setup.sh!"
     exit 7
 fi
-echo "$0 part 9.2"
 if [[ "${_verbose}" == "true" ]]; then
     cat stdout
 fi
@@ -528,7 +521,6 @@ if [[ "${_debug}" == "true" ]]; then
     set -x
 fi
 set -u
-echo "$0 part 9.3"
 machine=${MACHINE_ID}
 
 # If _yaml_dir is not set, set it to $HOMEglobal/dev/ci/cases/pr
@@ -564,7 +556,6 @@ fi
 # Build and Link Workflow
 # --------------------------------------------------------------------------- #
 
-echo "$0 part 9.5"
 # Build the system if requested
 if [[ "${_build}" == "true" ]]; then
     printf "Building via build_all.sh %s\n\n" "${_build_flags}"
@@ -580,7 +571,6 @@ if [[ "${_build}" == "true" ]]; then
     ${HOMEglobal}/sorc/build_all.sh ${_compute_build_flag:-} ${_verbose_flag} ${_build_flags}
 fi
 
-echo "$0 part 10"
 # Link the workflow silently unless there's an error
 if [[ "${_verbose}" == true ]]; then
     printf "Linking the workflow\n\n"
@@ -664,39 +654,33 @@ if [[ "${_verbose}" == true ]]; then
     printf "Selected cases: %s\n\n" "${_yaml_list[*]}"
 fi
 
-echo "$0 part 11.1"
 for _case in "${_yaml_list[@]}"; do
     echo "case: ${_case}"
     if [[ "${_verbose}" == false ]]; then
         echo "${_case}"
     fi
     _pslot="${_case}${_tag}"
-echo "$0 part 11.2"
 
     if [[ "${_run_with_container}" == "true" ]]; then
-        ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env ${HOMEgfs}/dev/container/env
-        ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${HOMEgfs}/dev/container/prefix
-        ln -sf ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${HOMEgfs}/env/CONTAINER.env
+        ln -sf ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env ${HOMEglobal}/dev/container/env
+        ln -sf ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${HOMEglobal}/dev/container/prefix
+        ln -sf ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${HOMEglobal}/env/CONTAINER.env
         UMID="${MACHINE_ID^^}"
-        if [[ -f ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
-            cp ${HOMEgfs}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${HOMEgfs}/env/${UMID}.env
+        if [[ -f ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
+            cp ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${HOMEglobal}/env/${UMID}.env
         fi
-        source ${HOMEgfs}/env/CONTAINER.env
+        source ${HOMEglobal}/env/CONTAINER.env
         if [[ "${_has_rocotorun}" == "true" ]]; then
-            _create_exp_cmd="${HOMEgfs}/dev/container/prefix/container_python.sh ./create_experiment.py \
+            _create_exp_cmd="${HOMEglobal}/dev/container/prefix/container_python.sh ./create_experiment.py \
                 -y ${_yaml_dir}/${_case}.yaml -r ${_rocotorun_fullpath} --overwrite"
         else
-            _create_exp_cmd="${HOMEgfs}/dev/container/prefix/container_python.sh ./create_experiment.py \
+            _create_exp_cmd="${HOMEglobal}/dev/container/prefix/container_python.sh ./create_experiment.py \
                 -y ${_yaml_dir}/${_case}.yaml --overwrite"
         fi
     else
-        ln -sf ${HOMEgfs}/env/CONTAINER4host ${HOMEgfs}/env/CONTAINER.env
+        ln -sf ${HOMEglobal}/env/CONTAINER4host ${HOMEglobal}/env/CONTAINER.env
         _create_exp_cmd="./create_experiment.py -y ${_yaml_dir}/${_case}.yaml --overwrite"
     fi
-echo "$0 part 11.3"
-    echo "_pslot: ${_pslot}"
-    echo "_runtests: ${_runtests}"
-    echo "_create_exp_cmd: ${_create_exp_cmd}"
     if [[ "${_verbose}" == true ]]; then
         pslot=${_pslot} RUNTESTS=${_runtests} ${_create_exp_cmd}
     else
@@ -714,7 +698,6 @@ echo "$0 part 11.3"
         rm -f stdout stderr
     fi
 
-echo "$0 part 11.4"
     # Check if DATAROOT is already present; eval will return just DATAROOT from the sourcing
     eval "$(
         PDY=0 cyc=0 source "${_runtests}/EXPDIR/${_pslot}/config.base" >&/dev/null
@@ -735,7 +718,6 @@ echo "$0 part 11.4"
         fi
     fi
 
-echo "$0 part 11.5"
     # Check if this experiment is using cron or scron
     cron_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.crontab"
     scron_sh_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.scron.sh"
@@ -751,7 +733,6 @@ echo "$0 part 11.5"
         exit 13
     fi
 
-echo "$0 part 11.6"
     if [[ "${_use_scron}" == true ]]; then
         {
             grep "^####" "${cron_file}"
@@ -873,8 +854,7 @@ if [[ "${_debug}" == "false" ]]; then
     rm -f final.cron existing.cron tests.cron "${_verbose_flag}"
 fi
 
-echo "$0 part 14"
-unset HOMEgfs
+unset HOMEglobal
 echo "Success!!"
 #if [[ "${_set_email}" == true && "${_debug}" == "true" ]]; then
 #    final_message=$'Success!\n'"${final_message:-}"

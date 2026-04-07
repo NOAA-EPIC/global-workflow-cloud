@@ -6,5 +6,5 @@
  singularity exec \
         ${CONTAINER_BINDINGS} \
         "${CONTAINER_SIF}" \
-        "${HOMEgfs}/dev/container/env/gfsutils-env.sh" \
+        "${HOMEglobal}/dev/container/env/gfsutils-env.sh" \
         "$@"

@@ -14,5 +14,5 @@
         -B ${I_MPI_PMI_LIBRARY} \
         ${CONTAINER_BINDINGS} \
         "${CONTAINER_SIF}" \
-        "${HOMEgfs}/dev/container/env/model-env.sh" \
+        "${HOMEglobal}/dev/container/env/model-env.sh" \
         "$@"
