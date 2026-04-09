@@ -81,7 +81,7 @@ export HOMEglobal
 if [[ -v SINGULARITY_CONTAINER ]]; then
     # Need to use dummy function to avoid passing arg list
     load_python_env() {
-        source "${HOMEgfs}/dev/container/env/python-env.sh"
+        source "${HOMEglobal}/dev/container/env/python-env.sh"
     }
     load_python_env
 else

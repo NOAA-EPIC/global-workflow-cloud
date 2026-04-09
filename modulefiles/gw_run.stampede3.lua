@@ -2,7 +2,7 @@ help([[
 Load environment to run GFS on stampede3
 ]])
 
--- Test that HOMEgfs is set.
+-- Test that HOMEglobal is set.
 -- If not, load_modules.sh was not sourced to load this module.
 local homegfssdir=os.getenv("HOMEglobal") or "None"
 if (homegfssdir == "None") then

@@ -73,8 +73,8 @@ Compile the Global Workflow
 
       set -x
 
-      HOMEgfs="$(cd "$(dirname  "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd )"
-      source "${HOMEgfs}/ush/detect_machine.sh"
+      HOMEglobal="$(cd "$(dirname  "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd )"
+      source "${HOMEglobal}/ush/detect_machine.sh"
       sif=ubuntu22.04-intel-ufs-env-v1.9.2.img
 
       if [[ ${MACHINE_ID} = ursa* ]] ; then
@@ -111,8 +111,8 @@ Setup the Global Workflow Run Case
 
       set -x
 
-      HOMEgfs="$(cd "$(dirname  "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd )"
-      source "${HOMEgfs}/ush/detect_machine.sh"
+      HOMEglobal="$(cd "$(dirname  "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd )"
+      source "${HOMEglobal}/ush/detect_machine.sh"
 
       run_with_container="YES"
       #run_with_container="NO"
@@ -126,7 +126,7 @@ Setup the Global Workflow Run Case
       #casetype=hires
       #yamllist="C768_S2SW"
 
-      HOMEDIR=${HOMEgfs}
+      HOMEDIR=${HOMEglobal}
       img=ubuntu22.04-intel-ufs-env-v1.9.2.img
       if [[ ${MACHINE_ID} = ursa* ]] ; then
          container=/scratch3/NCEPDEV/nems/role.epic/containers/${img}
