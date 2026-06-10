@@ -51,7 +51,7 @@ fi
 "${PYCMD:-python}" "${SCRgfs}"/exglobal_oceanice_products.py ${PYEXTRAARGS:-} && true
 export err=$?
 if [[ ${err} -ne 0 ]]; then
-    err_exit
+    err_exit "Failed to generate ${COMPONENT} products."
 fi
 
 ##############################################

@@ -1,5 +1,24 @@
 #! /usr/bin/env bash
 
+#===============================================================================
+#
+#   FILE: get_ioda.sh
+#
+#   DESCRIPTION: This script transfers multi-component observational data dumps
+#                (e.g., IODA files) from a source staging directory to the target
+#                model runtime directory. It dynamically loops through all
+#                available component subdirectories (e.g., atmos, ocean, land),
+#                verifies the presence of a completion status log (*status.log)
+#                for each component, and copies the relevant cycle-prefixed files.
+#
+#
+#    ARGUMENTS:
+#       $1 - YMD        : Date of the cycle in YYYYMMDD format.
+#       $2 - HH         : Hour of the cycle (e.g., 00, 06, 12, 18).
+#       $3 - RUN        : Model run identifier (e.g., gfs, gdas).
+#       $4 - SOURCE_DIR : (Optional) Override for the source IODA dump directory.
+#       $5 - TARGET_DIR : (Optional) Override for the target runtime directory.
+
 YMD=${1:-""}
 HH=${2:-""}
 RUN=${3:-""}
@@ -9,7 +28,7 @@ TARGET_DIR=${5:-${ROTDIR}/${RUN}.${YMD}/${HH}}
 DUMP_SUFFIX=${DUMP_SUFFIX:-""}
 
 # Exit if SOURCE_DIR does not exist
-if [[ ! -s "${SOURCE_DIR}" ]]; then
+if [[ ! -d "${SOURCE_DIR}" ]]; then
     echo "FATAL ERROR: DUMP SOURCE_DIR=${SOURCE_DIR} does not exist"
     exit 99
 fi
