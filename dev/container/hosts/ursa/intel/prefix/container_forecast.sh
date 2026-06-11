@@ -6,5 +6,5 @@
  singularity exec \
         ${CONTAINER_BINDINGS} \
         "${CONTAINER_SIF}" \
-        "${HOMEglobal}/dev/container/env/model-env.sh" \
+        "/scratch5/purged/Wei.Huang/src/global-workflow-cloud/dev/container/env/model-env.sh" \
         "$@"

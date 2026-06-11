@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -x
+# set -x
+echo "$0 part 0"
 ###
 function _usage() {
     cat << EOF
@@ -89,7 +90,8 @@ EOF
 }
 
 #set -eu
-set -x
+#set -x
+echo "$0 part 1"
 
 # --------------------------------------------------------------------------- #
 # Defaults and Runtime State
@@ -199,7 +201,7 @@ function _parse_option() {
 
 function _parse_args() {
     while [[ $# -gt 0 && "$1" != "--" ]]; do
-        while getopts ":H:bBDuyr:Y:GESCA:I:ce:t:vVdRh" option; do
+        while getopts ":H:bBDuy:Y:GESCA:I:ce:t:r:vVdRh" option; do
             _parse_option
         done
 
@@ -287,10 +289,11 @@ if [[ -z "${_runtests}" ]]; then
 fi
 
 # Turn on logging if running in debug mode
-if [[ "${_debug}" == "true" ]]; then
-    set -x
-fi
+#if [[ "${_debug}" == "true" ]]; then
+#    set -x
+#fi
 
+echo "$0 part 2"
 # --------------------------------------------------------------------------- #
 # Prepare RUNTESTS Directory
 # --------------------------------------------------------------------------- #
@@ -352,6 +355,7 @@ if [[ "${_run_all_gfs}" == "true" ||
 
 fi
 
+echo "$0 part 3"
 # Set HOMEglobal if it wasn't set by the user
 if [[ "${_specified_home}" == "false" ]]; then
     script_relpath="$(dirname "${BASH_SOURCE[0]}")"
@@ -436,6 +440,7 @@ EOM
     fi
 }
 
+echo "$0 part 4"
 # --------------------------------------------------------------------------- #
 # Expand Case List By System Flags
 # --------------------------------------------------------------------------- #
@@ -477,6 +482,7 @@ if [[ "${_run_all_gcafs}" == "true" ]]; then
     _yaml_list=("${_yaml_list[@]}" "${_gcafs_yaml_list[@]}")
 fi
 
+echo "$0 part 5"
 # --------------------------------------------------------------------------- #
 # Optional Submodule Update
 # --------------------------------------------------------------------------- #
@@ -507,6 +513,7 @@ EOM
     fi
 fi
 
+echo "$0 part 5.1"
 # --------------------------------------------------------------------------- #
 # Load Workflow Environment
 # --------------------------------------------------------------------------- #
@@ -528,9 +535,9 @@ if [[ "${_verbose}" == "true" ]]; then
     cat stdout
 fi
 rm -f stdout
-if [[ "${_debug}" == "true" ]]; then
-    set -x
-fi
+#if [[ "${_debug}" == "true" ]]; then
+#    set -x
+#fi
 set -u
 machine=${MACHINE_ID}
 
@@ -539,6 +546,7 @@ if [[ -z ${_yaml_dir} ]]; then
     _yaml_dir="${HOMEglobal}/dev/ci/cases/pr"
 fi
 
+echo "$0 part 6"
 # --------------------------------------------------------------------------- #
 # Resolve HPC Account
 # --------------------------------------------------------------------------- #
@@ -598,6 +606,7 @@ if ! "${HOMEglobal}/sorc/link_workflow.sh" >&stdout; then
 fi
 rm -f stdout
 
+echo "$0 part 7"
 # --------------------------------------------------------------------------- #
 # Validate YAML Inputs For This Host
 # --------------------------------------------------------------------------- #
@@ -657,6 +666,7 @@ fi
 # Create Experiments and Collect Schedule Entries
 # --------------------------------------------------------------------------- #
 
+echo "$0 part 8"
 # Create the experiments
 rm -f "tests.cron" "${_verbose_flag}"
 echo "Running create_experiment.py for ${#_yaml_list[@]} cases"
@@ -665,6 +675,9 @@ if [[ "${_verbose}" == true ]]; then
     printf "Selected cases: %s\n\n" "${_yaml_list[*]}"
 fi
 
+gwHomeDir=${HOMEglobal}
+
+echo "$0 part 8.1"
 for _case in "${_yaml_list[@]}"; do
     echo "case: ${_case}"
     if [[ "${_verbose}" == false ]]; then
@@ -672,26 +685,28 @@ for _case in "${_yaml_list[@]}"; do
     fi
     _pslot="${_case}${_tag}"
 
+echo "$0 part 8.2"
     if [[ "${_run_with_container}" == "true" ]]; then
-        ln -sf ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env ${HOMEglobal}/dev/container/env
-        ln -sf ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${HOMEglobal}/dev/container/prefix
-        ln -sf ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${HOMEglobal}/env/CONTAINER.env
+        ln -sf ${gwHomeDir}/dev/container/hosts/${MACHINE_ID}/intel/env ${gwHomeDir}/dev/container/env
+        ln -sf ${gwHomeDir}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${gwHomeDir}/dev/container/prefix
+        ln -sf ${gwHomeDir}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${gwHomeDir}/env/CONTAINER.env
         UMID="${MACHINE_ID^^}"
-        if [[ -f ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
-            cp ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${HOMEglobal}/env/${UMID}.env
+        if [[ -f ${gwHomeDir}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
+            cp ${gwHomeDir}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${gwHomeDir}/env/${UMID}.env
         fi
-        source ${HOMEglobal}/env/CONTAINER.env
+        source ${gwHomeDir}/env/CONTAINER.env
         if [[ "${_has_rocotorun}" == "true" ]]; then
-            _create_exp_cmd="${HOMEglobal}/dev/container/prefix/container_python.sh ./create_experiment.py \
+            _create_exp_cmd="${gwHomeDir}/dev/container/prefix/container_python.sh ./create_experiment.py \
                 -y ${_yaml_dir}/${_case}.yaml -r ${_rocotorun_fullpath} --overwrite"
         else
-            _create_exp_cmd="${HOMEglobal}/dev/container/prefix/container_python.sh ./create_experiment.py \
+            _create_exp_cmd="${gwHomeDir}/dev/container/prefix/container_python.sh ./create_experiment.py \
                 -y ${_yaml_dir}/${_case}.yaml --overwrite"
         fi
     else
-        ln -sf ${HOMEglobal}/env/CONTAINER4host ${HOMEglobal}/env/CONTAINER.env
+        ln -sf ${gwHomeDir}/env/CONTAINER4host ${gwHomeDir}/env/CONTAINER.env
         _create_exp_cmd="./create_experiment.py -y ${_yaml_dir}/${_case}.yaml --overwrite"
     fi
+echo "$0 part 8.3"
     if [[ "${_verbose}" == true ]]; then
         pslot=${_pslot} RUNTESTS=${_runtests} ${_create_exp_cmd}
     else
@@ -709,11 +724,14 @@ for _case in "${_yaml_list[@]}"; do
         rm -f stdout stderr
     fi
 
+echo "$0 part 8.4"
     # Check if DATAROOT is already present; eval will return just DATAROOT from the sourcing
     eval "$(
         PDY=0 cyc=0 source "${_runtests}/EXPDIR/${_pslot}/config.base" >&/dev/null
         echo _dataroot="${STMP}/RUNDIRS/${_pslot}"
     )"
+    # STMP=/scratch5/purged/${USER}/stmp/prefix
+    # _dataroot="${STMP}/RUNDIRS/${_pslot}"
     if [[ -d "${_dataroot}" ]]; then
         echo "WARNING DATAROOT already exists for ${_pslot} in ${_dataroot}"
         if [[ "${_auto_del}" == "true" ]]; then
@@ -729,6 +747,7 @@ for _case in "${_yaml_list[@]}"; do
         fi
     fi
 
+echo "$0 part 8.5"
     # Check if this experiment is using cron or scron
     cron_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.crontab"
     scron_sh_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.scron.sh"
@@ -754,6 +773,7 @@ for _case in "${_yaml_list[@]}"; do
 done
 echo
 
+echo "$0 part 9"
 # --------------------------------------------------------------------------- #
 # Build Master Runner Script for scrontab (if using scron)
 # --------------------------------------------------------------------------- #
@@ -814,6 +834,7 @@ if [[ "${_use_scron}" == true && ${#_scron_sh_files[@]} -gt 0 ]]; then
     } >> tests.cron
 fi
 
+echo "$0 part 10"
 # --------------------------------------------------------------------------- #
 # Configure Mail Behavior
 # --------------------------------------------------------------------------- #
@@ -836,6 +857,7 @@ fi
 # Install or Print Scheduler Entries
 # --------------------------------------------------------------------------- #
 
+echo "$0 part 11"
 # Update the cron
 if [[ "${_update_cron}" == "true" ]]; then
     printf "Updating the existing crontab\n\n"
@@ -923,6 +945,7 @@ if [[ "${_debug}" == "false" ]]; then
     rm -f final.cron existing.cron tests.cron "${_verbose_flag}"
 fi
 
+echo "$0 part 12"
 unset HOMEglobal
 echo "Success!!"
 #if [[ "${_set_email}" == true && "${_debug}" == "true" ]]; then

@@ -2,8 +2,8 @@
 
 set -x
 
-HOMEglobal="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." > /dev/null 2>&1 && pwd)"
-source "${HOMEglobal}/ush/detect_machine.sh"
+GWHOMEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." > /dev/null 2>&1 && pwd)"
+source "${GWHOMEDIR}/ush/detect_machine.sh"
 
 run_with_container="YES"
 #run_with_container="NO"
@@ -17,7 +17,6 @@ yamllist="C48_S2SW"
 #casetype=hires
 #yamllist="C768_S2SW"
 
-HOMEDIR=${HOMEglobal}
 img=ubuntu22.04-intel-ufs-env-v1.9.2.img
 if [[ ${MACHINE_ID} = ursa* ]]; then
     rundir="/scratch3/NAGAPE/epic/${USER}/run/prefix"
@@ -64,29 +63,31 @@ set -x
 
 mkdir -p "${rundir}"
 
-cd "${HOMEDIR}/dev/workflow" || exit 1
+cd "${GWHOMEDIR}/dev/workflow" || exit 1
 
 if [[ "${run_with_container}" == "YES" ]]; then
     CONTAINER_OPTIONS="-R -r \"${rocotocmd}\""
 
-    ln -sf ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env ${HOMEglobal}/dev/container/env
-    ln -sf ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${HOMEglobal}/dev/container/prefix
-    cp ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${HOMEglobal}/env/CONTAINER.env
+    ln -sf ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/env ${GWHOMEDIR}/dev/container/env
+    ln -sf ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${GWHOMEDIR}/dev/container/prefix
+    cp ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${GWHOMEDIR}/env/CONTAINER.env
     UMID="${MACHINE_ID^^}"
-    if [[ -f ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
-        cp ${HOMEglobal}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${HOMEglobal}/env/${UMID}.env
+    if [[ -f ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
+        cp ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${GWHOMEDIR}/env/${UMID}.env
     fi
-    source ${HOMEglobal}/env/CONTAINER.env
+    source ${GWHOMEDIR}/env/CONTAINER.env
 else
     CONTAINER_OPTIONS=" "
 fi
 
 RUNTESTS="${rundir}" \
 ./generate_workflows.sh \
-        -H "${HOMEDIR}" \
+        -H "${GWHOMEDIR}" \
         -y "${yamllist}" \
-        -Y "${HOMEDIR}/dev/ci/cases/${casetype}" \
+        -Y "${GWHOMEDIR}/dev/ci/cases/${casetype}" \
         -A "${HPC_ACCOUNT}" \
         -e "${USER}@noaa.gov" \
         ${CONTAINER_OPTIONS} \
         -v
+
+unset GWHOMEDIR

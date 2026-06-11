@@ -48,7 +48,7 @@ fi
 ###############################################################
 # Run exglobal script
 # shellcheck disable=2086
-"${PYCMD:-python}" "${SCRgfs}"/exglobal_oceanice_products.py ${PYEXTRAARGS:-} && true
+"${PYCMD:-python}" "${SCRglobal}"/exglobal_oceanice_products.py ${PYEXTRAARGS:-} && true
 export err=$?
 if [[ ${err} -ne 0 ]]; then
     err_exit "Failed to generate ${COMPONENT} products."

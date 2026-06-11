@@ -45,7 +45,7 @@ export PREFIX="${RUN}.t${cyc}z."
 
 ###############################################################
 # Run exglobal script
-${CONTAINER_GFSUTILS:-} "${SCRgfs}/exglobal_atmos_products.sh" && true
+${CONTAINER_GFSUTILS:-} "${SCRglobal}/exglobal_atmos_products.sh" && true
 export err=$?
 if [[ ${err} -ne 0 ]]; then
     err_exit "Failed to generate atmospheric GRIB2 products"

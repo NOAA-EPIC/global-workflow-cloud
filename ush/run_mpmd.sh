@@ -111,33 +111,10 @@ chunk_mpmd() {
         return 1
     fi
 
-<<<<<<< HEAD
-if [[ -v SINGULARITY_CONTAINER ]]; then
-  # # Redirect output from each process to its own stdout
-  # # Read the incoming cmdfile and create mpiexec usable cmdfile
-    nm=0
-    # shellcheck disable=SC2312
-    while IFS= read -r line; do
-        ${line} > "mpmd.${nm}.out" &
-        ((nm = nm + 1))
-    done < "${cmdfile}"
-    wait
-
-  # while IFS= read -r line; do
-  #     echo "-n 1 ${line}" >> "${mpmd_cmdfile}"
-  #     ((nm = nm + 1))
-  # done < "${cmdfile}"
-
-  # mpiexec --app "${mpmd_cmdfile}"
-    err=$?
-
-elif [[ "${launcher:-}" =~ ^srun.* ]]; then #  srun-based system e.g. Hera, Orion, etc.
-=======
     if [[ -f "${chunk_file}" ]]; then
         echo "ERROR: chunk file '${chunk_file}' already exists!"
         return 1
     fi
->>>>>>> origin/develop
 
     # Determine which line to start reading from
     local _start_line=$(((chunk_num - 1) * chunk_sz + 1))
@@ -153,9 +130,24 @@ elif [[ "${launcher:-}" =~ ^srun.* ]]; then #  srun-based system e.g. Hera, Orio
         if [[ ${_counter} -ge ${_start_line} && ${_counter} -le ${_end_line} ]]; then
             local i=$((_counter - _start_line))
             # Slurm requires a counter in front of each line in the script
-            if [[ "${_mpmd_launcher}" == "srun" ]]; then
+
+	    if [[ -v SINGULARITY_CONTAINER ]]; then
+              # Redirect output from each process to its own stdout
+              # Read the incoming cmdfile and create mpiexec usable cmdfile
+              # shellcheck disable=SC2312
+              ${line} > "mpmd.${_counter}.out" &
+         
+              # while IFS= read -r line; do
+              #     echo "-n 1 ${line}" >> "${mpmd_cmdfile}"
+              #     ((nm = nm + 1))
+              # done < "${cmdfile}"
+         
+              # mpiexec --app "${mpmd_cmdfile}"
+              err=$?
+            else
+              if [[ "${_mpmd_launcher}" == "srun" ]]; then
                 echo "${i} ${line}" >> "${chunk_file}"
-            elif [[ "${_mpmd_launcher}" == "mpiexec" ]]; then
+              elif [[ "${_mpmd_launcher}" == "mpiexec" ]]; then
                 # The MPMD implemtation is different between WCOSS and Derecho, but both
                 # use mpiexec
                 if [[ "${machine}" == "DERECHO" ]]; then
@@ -163,15 +155,20 @@ elif [[ "${launcher:-}" =~ ^srun.* ]]; then #  srun-based system e.g. Hera, Orio
                 else
                     echo "${line} > mpmd.${i}.out 2>&1" >> "${chunk_file}"
                 fi
-            fi
-            err=$?
-            if [[ ${err} -ne 0 ]]; then
-                echo "ERROR: Failed to write line '${line}' to chunk file '${chunk_file}'"
-                return "${err}"
-            fi
+              fi
+              err=$?
+              if [[ ${err} -ne 0 ]]; then
+                  echo "ERROR: Failed to write line '${line}' to chunk file '${chunk_file}'"
+                  return "${err}"
+              fi
+	    fi
         fi
         ((_counter = _counter + 1))
     done < "${mpmd_file}"
+
+    if [[ -v SINGULARITY_CONTAINER ]]; then
+	wait
+    fi
 
     return 0
 }
@@ -200,11 +197,6 @@ cat_outputs() {
         } >> mpmd.out
         rm -f "${file}"
     done
-<<<<<<< HEAD
-    if [[ -f mpmd.out ]]; then
-        cat mpmd.out
-    fi
-=======
 }
 
 cat << EOF
@@ -236,6 +228,7 @@ err=0
 for ((i = 0; i < nm; i += chunk_size)); do
     chunk_file="${mpmd_cmdfile}.chunk${chunk_num}"
     chunk_mpmd "${cmdfile}" "${chunk_size}" "${chunk_num}" "${chunk_file}"
+    if [[ ! -v SINGULARITY_CONTAINER ]]; then
     err=$?
     if [[ ${err} -ne 0 ]]; then
         echo "ERROR: Failed to create chunk file '${chunk_file}' from '${cmdfile}'"
@@ -272,6 +265,7 @@ for ((i = 0; i < nm; i += chunk_size)); do
         echo "ERROR: No output files found for MPMD job for chunk file '${chunk_file}'"
         break
     fi
+    fi
     ((chunk_num = chunk_num + 1))
 done
 
@@ -287,7 +281,6 @@ if [[ -s mpmd.out ]]; then
     cat mpmd.out
 else
     echo "WARNING: No output files found for MPMD job"
->>>>>>> origin/develop
 fi
 
 exit "${err}"

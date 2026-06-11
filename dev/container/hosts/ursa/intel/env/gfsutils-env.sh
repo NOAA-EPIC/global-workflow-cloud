@@ -1,7 +1,7 @@
 #!/bin/bash
 
 source /usr/lmod/lmod/init/bash
-module use "${HOMEglobal}/sorc/gfs_utils.fd/modulefiles"
+module use "/scratch5/purged/Wei.Huang/src/global-workflow-cloud/sorc/gfs_utils.fd/modulefiles"
 module load gfsutils_container.intel
 module load wgrib2
 module load gettext

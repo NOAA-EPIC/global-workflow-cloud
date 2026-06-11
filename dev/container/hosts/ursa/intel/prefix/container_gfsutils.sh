@@ -6,5 +6,5 @@ LD_LIBRARY_PATH=$(dirname "CONTAINER_SIF}")
  singularity exec \
         ${CONTAINER_BINDINGS} \
         "${CONTAINER_SIF}" \
-        "${HOMEglobal}/dev/container/env/gfsutils-env.sh" \
+        "/scratch5/purged/Wei.Huang/src/global-workflow-cloud/dev/container/env/gfsutils-env.sh" \
         "$@"
