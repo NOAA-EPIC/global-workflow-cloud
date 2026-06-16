@@ -322,6 +322,25 @@ class NEXUSEmissions(Task):
         logger.info(f"Created Restarts directory: {os.path.join(self.task_config.DATA, 'Restarts')}")
 
     @logit(logger)
+    def run_within_container(self):
+        """check if running in a contianer:
+        If any of: RUNNING_IN_CONTAINER, APPTAINER_CONTAINER, or SINGULARITY_CONTAINER is defined.
+        Then it is running in a container.
+        """
+        # logger.info(f"Check if NEXUS running in container")
+
+        ric = os.environ.get("RUNNING_IN_CONTAINER", "false").lower() == "true"
+        ac = os.environ.get("APPTAINER_CONTAINER", "false").lower() == "true"
+        sc = os.environ.get("SINGULARITY_CONTAINER", "false").lower() == "true"
+        ras = ric or ac or sc
+        # logger.info(f"RUNNING_IN_CONTAINER: {ric}")
+        # logger.info(f"APPTAINER_CONTAINER: {ac}")
+        # logger.info(f"SINGULARITY_CONTAINER: {sc}")
+        # logger.info(f"ras: {ras}")
+        return ras
+
+
+    @logit(logger)
     def execute(self) -> None:
         """Run NEXUS emission preprocessor based on configuration.
 
@@ -356,7 +375,15 @@ class NEXUSEmissions(Task):
         if not os.path.exists(self.task_config.DATA):
             raise WorkflowException(f"Working directory does not exist: {self.task_config.DATA}")
 
-        exe = Executable(self.task_config.APRUN)
+        logger.info(f"self.task_config.APRUN: {self.task_config.APRUN}")
+
+        if self.run_within_container():
+            gwhomedir=os.environ.get("GLOBALWORKFLOWHOMEDIR", "/scratch5/purged/Wei.Huang/src/global-workflow-cloud")
+            logger.info(f"GLOBALWORKFLOWHOMEDIR: {gwhomedir}")
+            exe_script = "time " + gwhomedir + "/dev/container/env/nexus-env.sh"
+            exe = Executable(exe_script)
+        else:
+            exe = Executable(self.task_config.APRUN)
 
         if os.path.exists("nexus.x") is False:
             raise WorkflowException("NEXUS preprocessor executable 'nexus.x' not found in PATH")

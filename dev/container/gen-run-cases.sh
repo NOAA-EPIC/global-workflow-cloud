@@ -2,15 +2,15 @@
 
 set -x
 
-GWHOMEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." > /dev/null 2>&1 && pwd)"
-source "${GWHOMEDIR}/ush/detect_machine.sh"
+gwHomeDir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." > /dev/null 2>&1 && pwd)"
+source "${gwHomeDir}/ush/detect_machine.sh"
 
 run_with_container="YES"
 #run_with_container="NO"
 
 casetype="pr"
-#yamllist="C48_ATM"
-yamllist="C48_S2SW"
+yamllist="C48_ATM"
+#yamllist="C48_S2SW"
 #yamllist="C48_S2SWA_gefs"
 #yamllist="C96mx100_S2S"
 
@@ -63,31 +63,31 @@ set -x
 
 mkdir -p "${rundir}"
 
-cd "${GWHOMEDIR}/dev/workflow" || exit 1
+cd "${gwHomeDir}/dev/workflow" || exit 1
 
 if [[ "${run_with_container}" == "YES" ]]; then
     CONTAINER_OPTIONS="-R -r \"${rocotocmd}\""
 
-    ln -sf ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/env ${GWHOMEDIR}/dev/container/env
-    ln -sf ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/prefix ${GWHOMEDIR}/dev/container/prefix
-    cp ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env ${GWHOMEDIR}/env/CONTAINER.env
     UMID="${MACHINE_ID^^}"
-    if [[ -f ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
-        cp ${GWHOMEDIR}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${GWHOMEDIR}/env/${UMID}.env
+    if [[ -f ${gwHomeDir}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ]]; then
+        cp ${gwHomeDir}/dev/container/hosts/${MACHINE_ID}/intel/env/${UMID}.env ${gwHomeDir}/env/${UMID}.env
     fi
-    source ${GWHOMEDIR}/env/CONTAINER.env
+    sed -e "s|GLOBALWORKFLOWHOMEDIR|${gwHomeDir}|g" \
+        ${gwHomeDir}/dev/container/hosts/${MACHINE_ID}/intel/env/CONTAINER.env \
+	> ${gwHomeDir}/env/CONTAINER.env
+    source ${gwHomeDir}/env/CONTAINER.env
 else
     CONTAINER_OPTIONS=" "
 fi
 
 RUNTESTS="${rundir}" \
 ./generate_workflows.sh \
-        -H "${GWHOMEDIR}" \
+        -H "${gwHomeDir}" \
         -y "${yamllist}" \
-        -Y "${GWHOMEDIR}/dev/ci/cases/${casetype}" \
+        -Y "${gwHomeDir}/dev/ci/cases/${casetype}" \
         -A "${HPC_ACCOUNT}" \
         -e "${USER}@noaa.gov" \
         ${CONTAINER_OPTIONS} \
         -v
 
-unset GWHOMEDIR
+unset gwHomeDir
