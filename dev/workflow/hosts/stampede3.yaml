@@ -18,8 +18,8 @@ COMINukmet: '/scratch3/NCEPDEV/global/role.glopara/data/external_gempak/ukmet'
 # BQS properties
 SCHEDULER: slurm
 QUEUE: batch
-PARTITION_BATCH: u1-compute
-PARTITION_SERVICE: u1-service
+PARTITION_BATCH: spr
+PARTITION_SERVICE: icx
 # HPSS properties
 HPSS_PROJECT: emc-global
 ARCHCOM_TO: 'hpss'
@@ -28,4 +28,5 @@ CHGRP_RSTPROD: 'YES'
 CHGRP_CMD: 'chgrp rstprod'
 # Features
 SUPPORTED_RESOLUTIONS: ['C1152', 'C768', 'C384', 'C192', 'C96', 'C48']
-DO_ARCHCOM: 'YES'
+DO_ARCHCOM: 'NO'
+DO_METP: 'NO'

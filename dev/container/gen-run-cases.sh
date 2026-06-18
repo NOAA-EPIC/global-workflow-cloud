@@ -89,4 +89,4 @@ RUNTESTS="${rundir}" \
         -A "${HPC_ACCOUNT}" \
         -e "${USER}@noaa.gov" \
         ${CONTAINER_OPTIONS} \
-        -v
+        -v "${rundir}"

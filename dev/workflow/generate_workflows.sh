@@ -198,7 +198,7 @@ function _parse_option() {
 
 function _parse_args() {
     while [[ $# -gt 0 && "$1" != "--" ]]; do
-        while getopts ":H:bBDuyr:Y:GESCA:I:ce:t:vVdRh" option; do
+        while getopts ":H:bBDsuy:Y:GESCA:I:ce:t:r:vVdhR" option; do
             _parse_option
         done
 
