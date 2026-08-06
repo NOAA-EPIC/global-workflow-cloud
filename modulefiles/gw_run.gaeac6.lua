@@ -2,11 +2,11 @@ help([[
 Load environment to run GFS on Gaea C6
 ]])
 
--- Test that HOMEgfs is set.
+-- Test that HOMEglobal is set.
 -- If not, load_modules.sh was not sourced to load this module.
-local homegfssdir=os.getenv("HOMEgfs") or "None"
-if (homegfssdir == "None") then
-    LmodError("FATAL ERROR HOMEgfs variable is unset.\n" ..
+local homegfssdir=os.getenv("HOMEglobal") or "None"
+if (homegfssdir == "None" and mode() == "load") then
+    LmodError("FATAL ERROR HOMEglobal variable is unset.\n" ..
               "Please \"source dev/ush/load_modules.sh\" rather than loading this module directly.\n")
 end
 
@@ -27,6 +27,8 @@ load(pathJoin("hsi", (os.getenv("hsi_ver") or "None")))
 -- Point to the wgrib2 executable with ipolates
 setenv("WGRIB2", "/autofs/ncrc-svm1_proj/epic/c6/spack-stack/spack-stack-1.9.1/envs/gw-intel-2023.2.0/install/intel/2023.2.0/wgrib2-3.6.0-fjguk3g/bin/wgrib2")
 prepend_path("PATH", "/autofs/ncrc-svm1_proj/epic/c6/spack-stack/spack-stack-1.9.1/envs/gw-intel-2023.2.0/install/intel/2023.2.0/wgrib2-3.6.0-fjguk3g/bin")
+
+setenv("CRTM_FIX","/gpfs/f6/drsa-precip3/world-shared/role.glopara/fix/crtm/v2.4.0.2")
 
 unload("cray-libsci")
 

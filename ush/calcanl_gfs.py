@@ -45,8 +45,8 @@ def calcanl_gfs(DoIAU, l4DEnsVar, Write4Danl, ComOut, APrefix,
                         gsi_utils.make_dir(CalcAnlDir)
                     gsi_utils.copy_file(ExecAnl, CalcAnlDir + '/calc_anl.x')
                     gsi_utils.link_file(RunDir + '/siginc.nc', CalcAnlDir + '/siginc.nc.06')
-                    gsi_utils.link_file(ComOut + '/' + APrefix + 'atmanl.ensres.nc', CalcAnlDir + '/anl.ensres.06')
-                    gsi_utils.link_file(ComIn_Ges + '/' + GPrefix + 'atmf006.ensres.nc', CalcAnlDir + '/ges.ensres.06')
+                    gsi_utils.link_file(ComOut + '/' + APrefix + 'ensres_analysis.atm.a006.nc', CalcAnlDir + '/anl.ensres.06')
+                    gsi_utils.link_file(ComIn_Ges + '/' + GPrefix + 'ensres.atm.f006.nc', CalcAnlDir + '/ges.ensres.06')
                     gsi_utils.link_file(RunDir + '/sigf06', CalcAnlDir + '/ges.06')
             else:
                 if os.path.isfile('sigi' + format(fh, '02') + '.nc'):
@@ -57,7 +57,7 @@ def calcanl_gfs(DoIAU, l4DEnsVar, Write4Danl, ComOut, APrefix,
                         gsi_utils.make_dir(CalcAnlDir)
                     if not os.path.exists(CalcAnlDir6):
                         gsi_utils.make_dir(CalcAnlDir6)
-                    gsi_utils.link_file(ComOut + '/' + APrefix + 'atma' + format(fh, '03') + '.nc',
+                    gsi_utils.link_file(ComOut + '/' + APrefix + 'analysis.atm.a' + format(fh, '03') + '.nc',
                                         CalcAnlDir6 + '/anl.' + format(fh, '02'))
                     gsi_utils.link_file(RunDir + '/siga' + format(fh, '02'),
                                         CalcAnlDir6 + '/anl.' + format(fh, '02'))
@@ -77,11 +77,11 @@ def calcanl_gfs(DoIAU, l4DEnsVar, Write4Danl, ComOut, APrefix,
                         gsi_utils.make_dir(CalcAnlDir)
                     if not os.path.exists(CalcAnlDir6):
                         gsi_utils.make_dir(CalcAnlDir6)
-                    gsi_utils.link_file(ComOut + '/' + APrefix + 'atma' + format(fh, '03') + '.ensres.nc',
+                    gsi_utils.link_file(ComOut + '/' + APrefix + 'ensres_analysis.atm.a' + format(fh, '03') + '.nc',
                                         CalcAnlDir6 + '/anl.ensres.' + format(fh, '02'))
                     gsi_utils.link_file(RunDir + '/sigi' + format(fh, '02') + '.nc',
                                         CalcAnlDir6 + '/siginc.nc.' + format(fh, '02'))
-                    gsi_utils.link_file(ComIn_Ges + '/' + GPrefix + 'atmf' + format(fh, '03') + '.ensres.nc',
+                    gsi_utils.link_file(ComIn_Ges + '/' + GPrefix + 'ensres.atm.f' + format(fh, '03') + '.nc',
                                         CalcAnlDir6 + '/ges.ensres.' + format(fh, '02'))
 
     else:
@@ -100,8 +100,8 @@ def calcanl_gfs(DoIAU, l4DEnsVar, Write4Danl, ComOut, APrefix,
             gsi_utils.make_dir(CalcAnlDir)
         gsi_utils.copy_file(ExecAnl, CalcAnlDir + '/calc_anl.x')
         gsi_utils.link_file(RunDir + '/siginc.nc', CalcAnlDir + '/siginc.nc.06')
-        gsi_utils.link_file(ComOut + '/' + APrefix + 'atmanl.ensres.nc', CalcAnlDir + '/anl.ensres.06')
-        gsi_utils.link_file(ComIn_Ges + '/' + GPrefix + 'atmf006.ensres.nc', CalcAnlDir + '/ges.ensres.06')
+        gsi_utils.link_file(ComOut + '/' + APrefix + 'ensres_analysis.atm.a006.nc', CalcAnlDir + '/anl.ensres.06')
+        gsi_utils.link_file(ComIn_Ges + '/' + GPrefix + 'ensres.atm.f006.nc', CalcAnlDir + '/ges.ensres.06')
 
     # get dimension information from background and increment files
     AnlDims = gsi_utils.get_ncdims('siginc.nc')
@@ -178,6 +178,7 @@ def calcanl_gfs(DoIAU, l4DEnsVar, Write4Danl, ComOut, APrefix,
         ExecCMDMPI1_host = 'mpiexec -l -n 1 --cpu-bind depth --depth ' + str(NThreads)
         ExecCMDMPI13_host = 'mpiexec -l -n 13 --cpu-bind depth --depth ' + str(NThreads)
     elif launcher == 'srun':
+        srun_suffix = os.getenv('SRUN_SUFFIX', '')
         nodes = os.getenv('SLURM_JOB_NODELIST', '')
         hosts_tmp = subprocess.check_output('scontrol show hostnames ' + nodes, shell=True)
         if (sys.version_info > (3, 0)):
@@ -191,17 +192,17 @@ def calcanl_gfs(DoIAU, l4DEnsVar, Write4Danl, ComOut, APrefix,
         hosts = []
         [hosts.append(x) for x in hosts_tmp if x not in hosts]
         nhosts = len(hosts)
-        ExecCMDMPI_host = 'srun -n ' + str(nFH) + ' --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores'
+        ExecCMDMPI_host = 'srun -n ' + str(nFH) + ' --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores' + srun_suffix
         # need to account for when fewer than LEVS tasks are available
         tasks = int(os.getenv('SLURM_NPROCS', 1))
         if levs > tasks:
-            ExecCMDMPILevs_host = 'srun -n ' + str(tasks) + ' --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores'
+            ExecCMDMPILevs_host = 'srun -n ' + str(tasks) + ' --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores' + srun_suffix
             ExecCMDMPILevs_nohost = 'srun -n ' + str(tasks) + ' --verbose --export=ALL'
         else:
-            ExecCMDMPILevs_host = 'srun -n ' + str(levs) + ' --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores'
-            ExecCMDMPILevs_nohost = 'srun -n ' + str(levs) + ' --verbose --export=ALL'
-        ExecCMDMPI1_host = 'srun -n 1 --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores'
-        ExecCMDMPI13_host = 'srun -n 13 --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores'
+            ExecCMDMPILevs_host = 'srun -n ' + str(levs) + ' --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores' + srun_suffix
+            ExecCMDMPILevs_nohost = 'srun -n ' + str(levs) + ' --verbose --export=ALL' + srun_suffix
+        ExecCMDMPI1_host = 'srun -n 1 --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores' + srun_suffix
+        ExecCMDMPI13_host = 'srun -n 13 --verbose --export=ALL -c 1 --distribution=arbitrary --cpu-bind=cores' + srun_suffix
     elif launcher == 'aprun':
         hostfile = os.getenv('LSB_DJOB_HOSTFILE', '')
         with open(hostfile) as f:
@@ -344,7 +345,7 @@ if __name__ == '__main__':
     ComOut = os.getenv('COMOUT_ATMOS_ANALYSIS', './')
     APrefix = os.getenv('APREFIX', '')
     NThreads = os.getenv('NTHREADS_CHGRES', 1)
-    FixDir = os.path.join(os.getenv('FIXgfs', './'), 'am')
+    FixDir = os.path.join(os.getenv('FIXglobal', './'), 'am')
     atmges_ens_mean = os.getenv('ATMGES_ENSMEAN', './atmges_ensmean')
     RunDir = os.getenv('DATA', './')
     ExecCMD = os.getenv('APRUN_CALCANL', '')

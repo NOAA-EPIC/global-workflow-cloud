@@ -13,15 +13,14 @@ The following environment variables must be set (either in your environment or v
 ```bash
 HPC_ACCOUNT       # Your HPC allocation account
 STAGED_CTESTS     # Path to nightly baseline COMROOT
-ICSDIR_ROOT       # Path to initial condition files
 ```
 
-These are typically defined in `$HOMEgfs/dev/ci/platforms/config.$MACHINE_ID`.
+These are typically defined in `$HOMEglobal/dev/ci/platforms/config.$MACHINE_ID`.
 
 ### Configure and Build
 
 ```bash
-cd $HOMEgfs/dev/ctests
+cd $HOMEglobal/dev/ctests
 mkdir -p build
 cd build
 
@@ -31,7 +30,6 @@ cmake ../../..
 # Or configure with explicit command-line options
 cmake -DHPC_ACCOUNT=myaccount \
       -DSTAGED_CTESTS=/path/to/baselines/RUNTESTS \
-      -DICSDIR_ROOT=/path/to/ics \
       ../../..
 ```
 
@@ -41,11 +39,14 @@ cmake -DHPC_ACCOUNT=myaccount \
 # Run all tests
 ctest
 
-# Run tests for a specific configuration case
-ctest -L C48_ATM
+# Run tests for a specific configuration case (trailing hyphen prevents partial matches)
+ctest -L "C48_ATM-"
+
+# Run all C48_S2SW tests (excludes C48_S2SWA_gefs tests)
+ctest -L "C48_S2SW-"
 
 # Run test for a specific JJOB
-cest -L C48_ATM-gfs_atmos_prod_f000-f002
+ctest -L "C48_ATM-gfs_atmos_prod_f000-f002"
 
 # Run a specific test with verbose output
 ctest -R test_C48_ATM-gfs_fcst_seg0_execute -V
@@ -56,6 +57,10 @@ ctest -j 4
 # Show test list without running
 ctest -N
 ```
+
+> **Note**: The trailing hyphen in `-L "C48_ATM-"` is important! Labels use binomial
+> nomenclature (`CASE-JOB`), and the hyphen acts as a natural delimiter. Without it,
+> `ctest -L C48_S2SW` would also match `C48_S2SWA_gefs` tests due to CTest's regex matching.
 
 ### Common CTest Options
 
@@ -213,13 +218,13 @@ cd build/scripts
 ## Key Directories
 
 ```
-$HOMEgfs/dev/ctests/              # Framework root
+$HOMEglobal/dev/ctests/              # Framework root
 ├── build/                        # CMake build directory (create this)
 ├── cases/                        # YAML test definitions
 ├── scripts/                      # Test phase scripts
 └── CMakeLists.txt                # Test configuration
 
-$HOMEgfs/dev/ci/platforms/        # Platform-specific configuration
+$HOMEglobal/dev/ci/platforms/        # Platform-specific configuration
 └── config.$MACHINE_ID            # Machine settings (STAGED_CTESTS, HPC_ACCOUNT, etc.)
 
 ${STAGED_CTESTS}/COMROOT/         # Nightly baseline outputs (input source)
@@ -228,22 +233,22 @@ ${RUNTESTS}/COMROOT/              # Test execution environments (created by test
 
 ## Platform Configuration
 
-Platform-specific settings are in `$HOMEgfs/dev/ci/platforms/config.$MACHINE_ID`:
+Platform-specific settings are in `$HOMEglobal/dev/ci/platforms/config.$MACHINE_ID`:
 
 ```bash
 # Example from config.hera
 export GFS_CI_ROOT=/scratch1/NCEPDEV/global/Terry.McGuinness/GFS_CI_ROOT
 export GITLAB_BUILDS_DIR=${GFS_CI_ROOT}/BUILDS/GITLAB
 export STAGED_CTESTS=${GITLAB_BUILDS_DIR}/stable/RUNTESTS
-export ICSDIR_ROOT=/scratch1/NCEPDEV/global/glopara/data/ICSDIR
+export BASE_IC=/scratch1/NCEPDEV/global/glopara/data/ICSDIR
 export HPC_ACCOUNT=nems
 ```
 
 Source the appropriate configuration before running CMake:
 
 ```bash
-source $HOMEgfs/ush/detect_machine.sh
-source $HOMEgfs/dev/ci/platforms/config.$MACHINE_ID
+source $HOMEglobal/ush/detect_machine.sh
+source $HOMEglobal/dev/ci/platforms/config.$MACHINE_ID
 ```
 
 ## Additional Resources
@@ -251,7 +256,7 @@ source $HOMEgfs/dev/ci/platforms/config.$MACHINE_ID
 - **Complete Documentation**: `docs/source/testing.rst`
 - **Test Case Examples**: `cases/*.yaml`
 - **CI/CD Pipeline**: `../ci/gitlab-ci-hosts.yml`
-- **Job Scripts**: `../../jobs/JGLOBAL_*`
+- **Job Scripts**: `../jobs/JGLOBAL_*`
 - **Platform Configuration**: `../ci/platforms/config.*`
 
 ---

@@ -73,17 +73,17 @@ class GFSCycledAppConfig(AppConfig):
 
             run_options[run]['do_hybvar'] = base.get('DOHYBVAR', False)
             run_options[run]['do_hybvar_ocn'] = base.get('DOHYBVAR_OCN', False)
+            run_options[run]['do_enkfonly_atm'] = base.get('DOENKFONLY_ATM', False)
             run_options[run]['do_letkf_ocn'] = base.get('DOLETKF_OCN', False)
             run_options[run]['nens'] = base.get('NMEM_ENS', 0)
-            if run_options[run]['do_hybvar']:
-                run_options[run]['lobsdiag_forenkf'] = base.get('lobsdiag_forenkf', False)
-
             run_options[run]['do_fit2obs'] = base.get('DO_FIT2OBS', True)
             run_options[run]['do_jediatmvar'] = base.get('DO_JEDIATMVAR', False)
             run_options[run]['do_jediatmens'] = base.get('DO_JEDIATMENS', False)
+            run_options[run]['do_jediatmens_split_obssol'] = base.get('DO_JEDIATMENS_SPLIT_OBSSOL', True)
             run_options[run]['do_jediocnvar'] = base.get('DO_JEDIOCNVAR', False)
             run_options[run]['do_jedisnowda'] = base.get('DO_JEDISNOWDA', False)
             run_options[run]['do_gsisoilda'] = base.get('DO_GSISOILDA', False)
+            run_options[run]['do_gsiliau'] = base.get('DO_LAND_IAU', run_options[run]['do_gsisoilda'])
             run_options[run]['do_mergensst'] = base.get('DO_MERGENSST', False)
 
         return run_options
@@ -106,16 +106,24 @@ class GFSCycledAppConfig(AppConfig):
 
         configs = ['prep']
 
+        if options['do_enkfonly_atm']:
+            configs += ['fetch', 'prepatmanlbias']
+            if options['do_archcom']:
+                configs += ['earc_tars', 'earc_groups']
+
         if options['do_prep_sfc']:
             configs += ['prep_sfc']
 
         if options['do_jediatmvar']:
-            configs += ['prepatmiodaobs', 'atmanlinit', 'atmanlvar', 'atmanlfv3inc', 'atmanlfinal', 'analcalc_fv3jedi']
+            if options['do_jediatmens']:
+                configs += ['atmanlinit', 'atmanlvar', 'atmanlfv3inc', 'atmanlfinal', 'analcalc_fv3jedi']
+            else:
+                configs += ['atmanlinit', 'atmanlvar', 'atmanlfv3inc', 'atmanlfinal', 'analcalc']
         else:
             configs += ['anal', 'analdiag', 'analcalc']
 
         if options['do_jediocnvar']:
-            configs += ['prepoceanobs', 'marineanlinit', 'marinebmatinit', 'marinebmat', 'marineanlvar']
+            configs += ['prepoceanobs', 'marinebmatinit', 'marinebmat', 'marineanlinit', 'marineanlvar']
             if options['do_letkf_ocn']:
                 configs += ['marineanlletkf']
             if options['do_hybvar']:
@@ -125,7 +133,7 @@ class GFSCycledAppConfig(AppConfig):
         if options['do_ocean'] or options['do_ice']:
             configs += ['oceanice_products']
 
-        configs += ['stage_ic', 'sfcanl', 'fcst', 'upp', 'atmos_products', 'arch_vrfy', 'cleanup']
+        configs += ['stage_ic', 'sfcanl_gcycle', 'fcst', 'upp', 'atmos_products', 'arch_vrfy', 'cleanup']
 
         if options['do_archcom']:
             configs += ['arch_tars']
@@ -138,7 +146,7 @@ class GFSCycledAppConfig(AppConfig):
             else:
                 configs += ['eobs', 'ediag', 'eupd', 'echgres', 'ecen']
 
-            configs += ['esfc', 'efcs', 'epos', 'earc_vrfy']
+            configs += ['esfc_gcycle', 'efcs', 'epos', 'earc_vrfy']
 
             if options['do_archcom']:
                 configs += ['earc_tars', 'earc_groups']
@@ -171,7 +179,7 @@ class GFSCycledAppConfig(AppConfig):
             configs += ['metp']
 
         if options['do_gempak']:
-            configs += ['gempak']
+            configs += ['gempak', 'gempakmeta']
             if options['do_goes']:
                 configs += ['npoess']
 
@@ -192,13 +200,16 @@ class GFSCycledAppConfig(AppConfig):
 
         if options['do_aero_anl']:
             configs += ['aeroanlgenb', 'aeroanlinit', 'aeroanlvar', 'aeroanlfinal']
-            if options['do_prep_obs_aero']:
-                configs += ['prepobsaero']
 
         if options['do_jedisnowda']:
             configs += ['snowanl']
             if options['do_hybvar']:
                 configs += ['esnowanl']
+
+        if options['do_gsisoilda']:
+            configs += ['sfcanl_regrid']
+            if options['do_hybvar']:
+                configs += ['esfc_regrid']
 
         if options['do_globusarch']:
             configs += ['globus']
@@ -250,14 +261,17 @@ class GFSCycledAppConfig(AppConfig):
                 if options['do_prep_sfc']:
                     task_names[run] += ['prep_sfc']
                 if options['do_jediatmvar']:
-                    task_names[run] += ['prepatmiodaobs', 'atmanlinit', 'atmanlvar', 'atmanlfv3inc', 'atmanlfinal', 'analcalc_fv3jedi']
+                    if options['do_jediatmens']:
+                        task_names[run] += ['atmanlinit', 'atmanlvar', 'atmanlfv3inc', 'atmanlfinal', 'analcalc_fv3jedi']
+                    else:
+                        task_names[run] += ['atmanlinit', 'atmanlvar', 'atmanlfv3inc', 'atmanlfinal', 'analcalc']
                 else:
                     task_names[run] += ['anal', 'analcalc']
 
                 if options['do_jediocnvar']:
-                    task_names[run] += ['prepoceanobs', 'marineanlinit', 'marinebmatinit', 'marinebmat', 'marineanlvar', 'marineanlchkpt', 'marineanlfinal']
+                    task_names[run] += ['prepoceanobs', 'marinebmatinit', 'marinebmat', 'marineanlinit', 'marineanlvar', 'marineanlchkpt', 'marineanlfinal']
 
-                task_names[run] += ['sfcanl']
+                task_names[run] += ['sfcanl_gcycle']
 
                 if options['do_jedisnowda']:
                     task_names[run] += ['snowanl']
@@ -276,15 +290,14 @@ class GFSCycledAppConfig(AppConfig):
                     if options['do_aero_anl']:
                         task_names[run] += ['aeroanlgenb']
 
+                    if options['do_gsisoilda']:
+                        task_names[run] += ['sfcanl_regrid']
                 else:
                     if options['do_wave']:
                         task_names[run] += wave_prep_tasks
 
                 if options['do_aero_anl']:
                     task_names[run] += ['aeroanlinit', 'aeroanlvar', 'aeroanlfinal']
-
-                    if options['do_prep_obs_aero']:
-                        task_names[run] += ['prepobsaero']
 
                 # Staging is gdas-specific
                 if run == 'gdas':
@@ -318,11 +331,13 @@ class GFSCycledAppConfig(AppConfig):
                     if options['do_verfrad']:
                         task_names[run] += ['verfrad']
 
+                # Only do analysis statistics for gdas cycles
+                if run == "gdas":
+                    if options['do_anlstat']:
+                        task_names[run] += ['anlstat']
+
                 if options['do_vminmon']:
                     task_names[run] += ['vminmon']
-
-                if options['do_anlstat']:
-                    task_names[run] += ['anlstat']
 
                 # gfs-only verification/tracking
                 if run == 'gfs':
@@ -375,13 +390,19 @@ class GFSCycledAppConfig(AppConfig):
 
                 task_names[run] += ['cleanup']
 
+                # Reset tasks to run enkf-only for atm if do_enkfonly_atm=true
+                if options['do_enkfonly_atm']:
+                    if run == 'gdas':
+                        task_names[run] = []
+                        task_names[run] += ['prep', 'fetchatmanlbias', 'prepatmanlbias']
+
             # Ensemble tasks
             elif 'enkf' in run:
 
                 task_names[run] += ['stage_ic']
                 if options['do_jediatmens']:
                     task_names[run] += ['atmensanlinit', 'atmensanlfv3inc', 'atmensanlfinal', 'ecen_fv3jedi']
-                    if options['lobsdiag_forenkf']:
+                    if options['do_jediatmens_split_obssol']:
                         task_names[run] += ['atmensanlobs', 'atmensanlsol']
                     else:
                         task_names[run] += ['atmensanlletkf']
@@ -403,7 +424,9 @@ class GFSCycledAppConfig(AppConfig):
                 task_names[run].append('efcs') if 'gdas' in run else 0
                 task_names[run].append('epos') if 'gdas' in run else 0
 
-                task_names[run] += ['esfc']
+                task_names[run] += ['esfc_gcycle']
+                if options['do_gsisoilda']:
+                    task_names[run].append('esfc_regrid') if 'gdas' in run else 0
                 task_names[run] += ['earc_vrfy']
 
                 if options['do_archcom']:
@@ -413,4 +436,17 @@ class GFSCycledAppConfig(AppConfig):
 
                 task_names[run] += ['cleanup']
 
+                # Reset tasks to run enkf-only for atm if do_enkfonly_atm=true
+                if options['do_enkfonly_atm']:
+                    task_names[run] = []
+                    task_names[run] += ['stage_ic']
+                    if options['do_jediatmens']:
+                        task_names[run] += ['atmensanlinit', 'atmensanlfv3inc', 'atmensanlfinal']
+                        if options['do_jediatmens_split_obssol']:
+                            task_names[run] += ['atmensanlobs', 'atmensanlsol']
+                        else:
+                            task_names[run] += ['atmensanlletkf']
+                    else:
+                        task_names[run] += ['eobs', 'eupd', 'ecen', 'ediag']
+                    task_names[run] += ['efcs', 'epos', 'esfc_gcycle', 'earc_tars', 'cleanup']
         return task_names

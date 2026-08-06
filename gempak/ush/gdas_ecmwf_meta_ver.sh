@@ -4,9 +4,8 @@
 # of ecmwf fcsts
 #
 
-source "${HOMEgfs}/ush/preamble.sh"
-
-export pgm=gdplot2_nc;. prep_step
+export pgm=gdplot2_nc
+source prep_step
 
 cyc2=12
 device="nc | ecmwfver.meta"
@@ -15,12 +14,13 @@ device="nc | ecmwfver.meta"
 # Copy in datatype table to define gdfile type
 #
 
-cpreq "${HOMEgfs}/gempak/fix/datatype.tbl" datatype.tbl
+cpreq "${HOMEglobal}/gempak/fix/datatype.tbl" datatype.tbl
 
+# TODO: Add only necessary files and remove unneeded ones to minimize data volume
+# TODO: remove live links and refer https://github.com/NOAA-EMC/global-workflow/issues/4406
 export COMIN="gdas.${PDY}${cyc}"
-if [[ ! -L ${COMIN} ]]; then
-    ${NLN} "${COMIN_ATMOS_GEMPAK_1p00}" "${COMIN}"
-fi
+rm -f "${COMIN}"
+${NLN} "${COMIN_ATMOS_GEMPAK_1p00}" "${COMIN}"
 vergrid="F-GDAS | ${PDY:2}/0600"
 fcsthr="0600f006"
 
@@ -28,7 +28,7 @@ fcsthr="0600f006"
 areas="SAM NAM"
 
 for area in ${areas}; do
-    if [[ "${area}" == "NAM" ]] ; then
+    if [[ "${area}" == "NAM" ]]; then
         garea="5.1;-124.6;49.6;-11.9"
         proj="STR/90.0;-95.0;0.0"
         latlon="0"
@@ -39,13 +39,12 @@ for area in ${areas}; do
         latlon="1/10/1/2/10;10"
         run=" "
     fi
-    for (( fhr=24; fhr<=168; fhr+=24 )); do
+    for ((fhr = 24; fhr <= 168; fhr += 24)); do
         dgdattim=$(printf "f%03d" "${fhr}")
         sdatenum=$(date --utc +%y%m%d -d "${PDY} ${cyc2} - ${fhr} hours")
 
-        if [[ ! -L "ecmwf.20${sdatenum}" ]]; then
-            ${NLN} "${COMINecmwf}/ecmwf.20${sdatenum}/gempak" "ecmwf.20${sdatenum}"
-        fi
+        rm -f "ecmwf.20${sdatenum}"
+        ${NLN} "${COMINecmwf}/ecmwf.20${sdatenum}/gempak" "ecmwf.20${sdatenum}"
         gdfile="ecmwf.20${sdatenum}/ecmwf_glob_20${sdatenum}12"
 
         # 500 MB HEIGHT METAFILE
@@ -142,19 +141,19 @@ export err=$?
 # WHEN IT CAN NOT PRODUCE THE DESIRED GRID.  CHECK
 # FOR THIS CASE HERE.
 #####################################################
-if (( err != 0 )) || [[ ! -s ecmwfver.meta ]]; then
+if [[ "${err}" -ne 0 ]] || [[ ! -s ecmwfver.meta ]]; then
     echo "FATAL ERROR: Failed to create ecmwf meta file"
     exit "${err}"
 fi
 
-mv ecmwfver.meta "${COMOUT_ATMOS_GEMPAK_META}/ecmwfver_${PDY}_${cyc2}"
+cpfs ecmwfver.meta "${COMOUT_ATMOS_GEMPAK_META}/ecmwfver_${PDY}_${cyc2}"
 export err=$?
-if (( err != 0 )) ; then
+if [[ "${err}" -ne 0 ]]; then
     echo "FATAL ERROR: Failed to move meta file to ${COMOUT_ATMOS_GEMPAK_META}/ecmwfver_${PDY}_${cyc2}"
     exit "${err}"
 fi
 
-if [[ "${SENDDBN}" == "YES" ]] ; then
+if [[ "${SENDDBN}" == "YES" ]]; then
     "${DBNROOT}/bin/dbn_alert" MODEL ECMWFVER_HPCMETAFILE "${job}" \
         "${COMOUT_ATMOS_GEMPAK_META}/ecmwfver_${PDY}_${cyc2}"
 fi

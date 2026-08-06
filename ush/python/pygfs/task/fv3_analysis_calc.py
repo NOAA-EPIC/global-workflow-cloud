@@ -16,7 +16,6 @@ class FV3AnalysisCalc(Analysis):
     """
     Class for analysis calculation
     """
-    @logit(logger, name="FV3AnalysisCalc")
     def __init__(self, config: Dict[str, Any]):
         """Constructor for analysis calculation task
 
@@ -87,11 +86,11 @@ class FV3AnalysisCalc(Analysis):
 
         # Initialize GDASApp JEDI addincrement application
         logger.info(f"Initializing GDASApp JEDI addincrement applications")
-        self.jedi_dict['atm_addincrement'].initialize(self.task_config)
+        self.jedi_dict['atm_addincrement'].initialize()
         if self.task_config.DO_AERO_ANL:
-            self.jedi_dict['aero_addincrement'].initialize(self.task_config)
+            self.jedi_dict['aero_addincrement'].initialize()
         if self.task_config.DO_JEDISNOWDA:
-            self.jedi_dict['snow_addincrement'].initialize(self.task_config)
+            self.jedi_dict['snow_addincrement'].initialize()
 
     @logit(logger)
     def execute(self) -> None:
@@ -162,7 +161,7 @@ class FV3AnalysisCalc(Analysis):
 
         # Write analysis log file
         formatted_date = datetime.now().strftime("%a %b %d %H:%M:%S %Z%Y")
-        log_file = os.path.join(self.task_config.COMOUT_ATMOS_ANALYSIS, f"{self.task_config.RUN}.t{self.task_config.cyc}z.loganl.txt")
+        log_file = os.path.join(self.task_config.COMOUT_ATMOS_ANALYSIS, f"{self.task_config.RUN}.t{self.task_config.cyc:02d}z.analysis.done.txt")
         message = f"{self.task_config.rCDUMP} {self.task_config.PDY}{self.task_config.cyc} atmanl and sfcanl done at {formatted_date}"
         with open(log_file, "w") as file:
             file.write(f"{message}\n")

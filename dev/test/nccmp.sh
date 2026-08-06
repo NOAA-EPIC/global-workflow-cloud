@@ -1,15 +1,14 @@
 #! /usr/bin/env bash
 
-set -eu
+HOMEglobal=$(cd "$(dirname "$(readlink -f -n "${BASH_SOURCE[0]}")")" && git rev-parse --show-toplevel)
+declare -rx HOMEglobal
 
-# shellcheck disable=SC2155,SC2312
-HOMEgfs=$(cd "$(dirname "$(readlink -f -n "${BASH_SOURCE[0]}" )" )/../.." && pwd -P)
-declare -rx HOMEgfs
-
-source "${HOMEgfs}/dev/ush/load_modules.sh" 1>/dev/null 2>&1
+source "${HOMEglobal}/dev/ush/load_modules.sh" run
+set +eu
 module load "nccmp/${nccmp_ver:-"1.9.0.1"}"
 
 file1=${1:?}
 file2=${2:?}
 
 nccmp -d -S -f -B --warn=format "${file1}" "${file2}"
+echo $?

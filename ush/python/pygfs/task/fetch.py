@@ -3,6 +3,7 @@
 import os
 from logging import getLogger
 from typing import Any, Dict
+import tarfile
 
 from wxflow import (Task, htar,
                     logit, parse_j2yaml, chdir)
@@ -16,7 +17,6 @@ class Fetch(Task):
     """Task to pull ROTDIR data from HPSS (or locally)
     """
 
-    @logit(logger, name="Fetch")
     def __init__(self, config: Dict[str, Any]) -> None:
         """Constructor for the Fetch task
         The constructor is responsible for collecting necessary yamls based on
@@ -49,7 +49,7 @@ class Fetch(Task):
         """
 
         fetch_yaml = fetch_dict.FETCH_YAML_TMPL
-        fetch_parm = os.path.join(fetch_dict.PARMgfs, "fetch")
+        fetch_parm = os.path.join(fetch_dict.PARMglobal, "fetch")
 
         parsed_fetch = parse_j2yaml(os.path.join(fetch_parm, fetch_yaml),
                                     fetch_dict)
@@ -85,12 +85,10 @@ class Fetch(Task):
             if on_hpss is True:  # htar all files in fnames
                 htar_obj = htar.Htar()
                 htar_obj.xvf(tarball, f_names)
-            else:  # tar all files in fnames
-                raise NotImplementedError("The fetch job does not yet support pulling from local archives")
-
-#                with tarfile.open(dest, "w") as tar:
-#                    for filename in f_names:
-#                        tar.add(filename)
+            else:  # extract from a specified tarball
+                with tarfile.open(tarball, "r") as tar:
+                    members = [m for m in tar.getmembers() if m.name in f_names]
+                    tar.extractall(members=members)
             # Verify all data files were extracted
             missing_files = []
             for f in f_names:

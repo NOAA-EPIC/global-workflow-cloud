@@ -13,7 +13,6 @@ class AtmAnalysis(Analysis):
     """
     Class for JEDI-based global atm deterministic analysis tasks
     """
-    @logit(logger, name="AtmAnalysis")
     def __init__(self, config: Dict[str, Any]):
         """Constructor global atm analysis task
 
@@ -35,6 +34,7 @@ class AtmAnalysis(Analysis):
 
         _res = int(self.task_config.CASE[1:])
         _res_anl = int(self.task_config.CASE_ANL[1:])
+        _res_his = int(self.task_config.CASE_HIST[1:])
 
         if self.task_config.DOHYBVAR:
             _BERROR_YAML = f"atmosphere_background_error_hybrid_{self.task_config.STATICB_TYPE}_{self.task_config.LOCALIZATION_TYPE}"
@@ -50,6 +50,9 @@ class AtmAnalysis(Analysis):
                 'npx_anl': _res_anl + 1,
                 'npy_anl': _res_anl + 1,
                 'npz_anl': self.task_config.LEVS - 1,
+                'npx_his': _res_his + 1,
+                'npy_his': _res_his + 1,
+                'npz_his': self.task_config.LEVS - 1,
                 'npz': self.task_config.LEVS - 1,
                 'BKG_TSTEP': "PT1H",  # Placeholder for 4D applications
                 'BERROR_YAML': _BERROR_YAML,
@@ -70,7 +73,8 @@ class AtmAnalysis(Analysis):
         This method will initialize a global atm analysis.
         This includes:
         - stage input files from COM and create output directories
-        - extract bias corrections from tar files
+        - stage observation files
+        - stage bias correction files
         - initialize JEDI applications
 
         Parameters
@@ -86,14 +90,18 @@ class AtmAnalysis(Analysis):
         logger.info(f"Staging files from COM and creating output directories")
         FileHandler(self.task_config.data_in).sync()
 
-        # Extract bias corrections from tar files
-        logger.info(f"Extracting bias corrections from tar files")
-        self.untar_bias_corrections()
+        # Stage observation files
+        logger.info(f"Staging observation files")
+        self.jedi_dict['atmanlvar'].stage_obsdatain(f"{self.task_config.COMIN_OBS}/atmos")
+
+        # Stage bias correction files
+        logger.info(f"Staging bias correction files")
+        self.jedi_dict['atmanlvar'].stage_obsbiasin(self.task_config.COMIN_ATMOS_ANALYSIS_PREV)
 
         # Initialize JEDI variational application
         logger.info(f"Initializing JEDI applications")
-        self.jedi_dict['atmanlvar'].initialize(self.task_config, clean_empty_obsspaces=True)
-        self.jedi_dict['atmanlfv3inc'].initialize(self.task_config)
+        self.jedi_dict['atmanlvar'].initialize(clean_empty_obsspaces=True)
+        self.jedi_dict['atmanlfv3inc'].initialize()
 
     @logit(logger)
     def execute(self, jedi_dict_key: str) -> None:
@@ -117,8 +125,8 @@ class AtmAnalysis(Analysis):
 
         This method will finalize a global atm analysis using JEDI.
         This includes:
-        - compress and tar output diag files in COM
-        - tar radiative bias correction files and place in COM
+        - archive, compress, and save diag files to COM directory
+        - tar radiative bias correction files to COM directory
         - save output files and YAMLs to COM
 
         Parameters
@@ -130,13 +138,15 @@ class AtmAnalysis(Analysis):
         None
         """
 
-        # Compress and tar diag files in COM directory
-        self.tar_diag_files(self.task_config.COMOUT_ATMOS_ANALYSIS,
-                            f"{self.task_config.APREFIX}atmstat")
+        # Archive, compress, and save diag files to COM directory
+        logger.info(f"Saving observation diag files to COM")
+        self.jedi_dict['atmanlvar'].save_obsdataout(self.task_config.COMOUT_ATMOS_ANALYSIS,
+                                                    f"{self.task_config.APREFIX}atmos_analysis.ioda_hofx")
 
-        # Tar radiative bias correction files into COM directory
-        self.tar_radiative_bias_corrections(self.task_config.COMOUT_ATMOS_ANALYSIS,
-                                            f"{self.task_config.APREFIX}rad_varbc_params.tar")
+        # Tar radiative bias correction files to COM directory
+        logger.info(f"Saving radiative bias correction files to COM")
+        self.jedi_dict['atmanlvar'].save_obsbiasout(self.task_config.COMOUT_ATMOS_ANALYSIS,
+                                                    f"{self.task_config.APREFIX}varbc_params")
 
         # Save files from COM
         logger.info(f"Saving files to COM")

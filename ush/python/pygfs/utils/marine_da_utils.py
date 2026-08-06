@@ -37,7 +37,7 @@ def link_executable(task_config: AttrDict, exe_name: str) -> None:
     """
     logger.info(f"Link executable {exe_name}")
     logger.warn("WARNING: Linking is not permitted per EE2.")
-    exe_src = os.path.join(task_config.EXECgfs, exe_name)
+    exe_src = os.path.join(task_config.EXECglobal, exe_name)
     exe_dest = os.path.join(task_config.DATA, exe_name)
     if os.path.exists(exe_dest):
         os.remove(exe_dest)
@@ -57,7 +57,7 @@ def prep_input_nml(task_config: AttrDict,
     FileHandler({'copy': [[mom_input_nml_tmpl_src, mom_input_nml_tmpl]]}).sync()
 
     # swap date and stacksize
-    date_init = [int(s) for s in task_config.MARINE_WINDOW_END.strftime('%Y,%m,%d,%H,%M,%S').split(',')]
+    date_init = [int(s) for s in task_config.WINDOW_END.strftime('%Y,%m,%d,%H,%M,%S').split(',')]
     input_nml_config = {'domain_stack_size': task_config.DOMAIN_STACK_SIZE,
                         'date_init': date_init,
                         'simple_geom': simple_geom,

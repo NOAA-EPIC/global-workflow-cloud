@@ -1,70 +1,91 @@
 #! /usr/bin/env bash
 
-WW3_namelists(){
+#===============================================================================
+#
+#   FILE: parsing_namelists_WW3.sh
+#
+#   DESCRIPTION: Prepares the environment and dynamically renders the configuration
+#                file required by the WAVEWATCH III (WW3) model.
+#                The function stages the required buoy location file
+#                and parses the desired input methods for ice and current coupling.
 
-# WW3 namelists/input generation
+WW3_namelists() {
 
-  FHMAX_WAV="${FHMAX_WAV:-384}"
+    # WW3 namelists/input generation
 
-# --------------------------------------------------------------------------- #
-# Buoy location file
+    FHMAX_WAV="${FHMAX_WAV:-384}"
 
-  if [ -f "${PARMgfs}/wave/wave_${NET}.buoys" ]
-  then
-    cpreq "${PARMgfs}/wave/wave_${NET}.buoys" "${DATA}/ww3_points.list"
-  fi
+    # --------------------------------------------------------------------------- #
+    # Buoy location file
 
-  if [ -f "${DATA}/ww3_points.list" ]
-  then
-    set +x
-    echo "ww3_points.list copied (${PARMgfs}/wave/wave_${NET}.buoys)."
-    set_trace
-  else
-    echo "FATAL ERROR : ww3_points.list (${PARMgfs}/wave/wave_${NET}.buoys) NOT FOUND"
-    exit 12
-  fi
+    if [[ -f "${PARMglobal}/wave/wave_${NET}.buoys" ]]; then
+        cpreq "${PARMglobal}/wave/wave_${NET}.buoys" "${DATA}/ww3_points.list"
+    fi
 
-  #set coupling to ice/current
-  WW3_ICE="F"
-  WW3_CUR="F"
+    if [[ -f "${DATA}/ww3_points.list" ]]; then
+        set +x
+        echo "ww3_points.list copied (${PARMglobal}/wave/wave_${NET}.buoys)."
+        set -x
+    else
+        echo "FATAL ERROR : ww3_points.list (${PARMglobal}/wave/wave_${NET}.buoys) NOT FOUND"
+        exit 12
+    fi
 
-  case ${WW3ICEINP} in
-    'YES' )
-      WW3_ICE="T";;
-    'CPL' )
-      WW3_ICE="C";;
-  esac
+    #set coupling to ice/current
+    WW3_ICE="F"
+    WW3_CUR="F"
 
-  case ${WW3CURINP} in
-    'YES' )
-      WW3_CUR="T";;
-    'CPL' )
-      WW3_CUR="C";;
-  esac
+    case ${WW3ICEINP} in
+        'YES')
+            WW3_ICE="T"
+            ;;
+        'CPL')
+            WW3_ICE="C"
+            ;;
+        *)
+            msg="FATAL: Unknown WW3ICEIMP ${WW3ICEINP}"
+            export err=100
+            err_exit "${msg}"
+            ;;
+    esac
 
-  # Variables used in atparse of shel template
-  export WW3_IC1="F"
-  export WW3_IC5="F"
-  export WW3_WLEV="F"
-  export WW3_ICE
-  export WW3_CUR
-  export WW3_OUTPARS="${OUTPARS_WAV}"
-  export WW3_DTFLD="${DTFLD_WAV}"
-  export WW3_DTPNT="${DTPNT_WAV}"
+    case ${WW3CURINP} in
+        'YES')
+            WW3_CUR="T"
+            ;;
+        'CPL')
+            WW3_CUR="C"
+            ;;
+        *)
+            msg="FATAL: Unknown WW3CURINP ${WW3CURINP}"
+            export err=100
+            err_exit "${msg}"
+            ;;
+    esac
 
-  export WW3_GRD_OUTDIR="./WW3_OUTPUT/"
-  export WW3_PNT_OUTDIR="./WW3_OUTPUT/"
-  export WW3_RST_OUTDIR="./WW3_RESTART/"
+    # Variables used in atparse of shel template
+    export WW3_IC1="F"
+    export WW3_IC5="F"
+    export WW3_WLEV="F"
+    export WW3_ICE
+    export WW3_CUR
+    export WW3_OUTPARS="${OUTPARS_WAV}"
+    export WW3_DTFLD="${DTFLD_WAV}"
+    export WW3_DTPNT="${DTPNT_WAV}"
 
-  # Ensure the template exists
-  local template=${WW3_INPUT_TEMPLATE:-"${PARMgfs}/ufs/ww3_shel.nml.IN"}
-  if [[ ! -f "${template}" ]]; then
-    echo "FATAL ERROR: template '${template}' does not exist, ABORT!"
-    exit 1
-  fi
-  rm -f "${DATA}/ww3_shel.nml"
-  atparse < "${template}" >> "${DATA}/ww3_shel.nml"
-  echo "Rendered ww3_shel.nml:"
-  cat "${DATA}/ww3_shel.nml"
+    export WW3_GRD_OUTDIR="./WW3_OUTPUT/"
+    export WW3_PNT_OUTDIR="./WW3_OUTPUT/"
+    export WW3_RST_OUTDIR="./WW3_RESTART/"
+
+    # Ensure the template exists
+    local template=${WW3_INPUT_TEMPLATE:-"${PARMglobal}/ufs/ww3_shel.nml.IN"}
+    if [[ ! -f "${template}" ]]; then
+        echo "FATAL ERROR: template '${template}' does not exist, ABORT!"
+        exit 1
+    fi
+    rm -f "${DATA}/ww3_shel.nml"
+    atparse < "${template}" >> "${DATA}/ww3_shel.nml"
+    echo "Rendered ww3_shel.nml:"
+    cat "${DATA}/ww3_shel.nml"
 
 }

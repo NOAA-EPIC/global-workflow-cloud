@@ -1,0 +1,37 @@
+#! /usr/bin/env bash
+set -x
+
+source "${HOMEglobal}/ush/jjob_header.sh" -e "wave_stat" -c "base wave wave_stat"
+
+#{% if false %}
+source "${HOMEglobal}/ush/jjob_standard_vars.sh"
+#{% else %}
+#{% include jjob_var_setup.j2 %}
+#{% endif %}
+
+source "${USHglobal}/jjob_shell_setup.sh"
+# Set strict mode which will exit on error or undefined variable
+# and exit on error in a pipeline (e.g. if a command in "cmd | cmd2" fails)
+source "${USHglobal}/set_strict.sh"
+source "${USHglobal}/wave_domain_grid.sh"
+
+# Set COM Paths
+
+for grid in ${wavepostGRD}; do
+    process_grdID "${grid}"
+    prod_dir_grid="COMOUT_WAVE_GRID_${grid}"
+    declare -rx "${prod_dir_grid}"="${ROTDIR}/${RUN}.${PDY}/${cyc}/ensstat/products/wave/gridded"
+done
+
+# Execute the Script
+#"${SCRglobal}/exgefs_wave_stat.sh"
+err_chk
+##########################################
+## Remove the Temporary working directory
+###########################################
+cd "${DATAROOT}" || true
+if [[ "${KEEPDATA}" != "YES" ]]; then
+    rm -rf "${DATA}"
+fi
+
+exit 0

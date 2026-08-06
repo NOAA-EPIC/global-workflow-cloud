@@ -1,0 +1,28 @@
+help([[
+Load environment to run the UPP on WCOSS2
+]])
+
+local homeglobal=os.getenv("HOMEglobal") or ""
+prepend_path("MODULEPATH", pathJoin(homeglobal,"/modulefiles/upp"))
+-- Load UPP modules
+load("wcoss2_intel")
+
+load(pathJoin("cray-pals", "1.0.17"))
+
+-- Load workflow modules
+-- Do not load prod_util when running ecflow
+local is_ecf = os.getenv("ECF_JOB") ~= nil
+if not is_ecf then
+    load(pathJoin("prod_util", "2.0.9"))
+end
+load(pathJoin("python", "3.12.0"))
+load(pathJoin("libjpeg", "9c"))
+load(pathJoin("wgrib2", "2.0.8"))
+load(pathJoin("grib_util","1.2.3"))
+setenv("WGRIB2","wgrib2")
+
+-- Load the GW Python environment
+prepend_path("MODULEPATH", "/apps/dev/modulefiles")
+load(pathJoin("ve","gw", "1.0"))
+
+whatis("Description: UPP run environment")

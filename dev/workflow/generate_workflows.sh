@@ -2,7 +2,7 @@
 
 ###
 function _usage() {
-   cat << EOF
+    cat << EOF
    This script automates the experiment setup process for the global workflow.
    Options are also available to update submodules, build the workflow (with
    specific build flags), specify which YAMLs and YAML directory to run, and
@@ -17,19 +17,21 @@ function _usage() {
        directory up from this script's residing directory.
 
     -b Run build_all.sh with default flags
-       (build the UFS, UPP, UFS_Utils, and GFS-utils only)
+       (build the UFS, UPP, UFS_Utils, and GFS-utils only on login nodes)
+
+    -B Run build_all.sh -c with default flags [-c triggers build on compute nodes]
+       (build the UFS, UPP, UFS_Utils, and GFS-utils only on compute nodes)
 
     -u Update submodules before building and/or generating experiments.
 
     -y "list of YAMLs to run"
-       If this option is not specified, the default case (C48_ATM) will be
-       run.  This option is incompatible with -G, -E, or -S.
+       This option is incompatible with -G, -E, -S, or -C.
        Example: -y "C48_ATM C48_S2SW C96C48_hybatmDA"
 
     -D Delete the RUNTESTS and DATAROOT directories if they already exist
 
     -Y /path/to/directory/with/YAMLs
-       If this option is not specified, then the \${HOMEgfs}/dev/ci/cases/pr
+       If this option is not specified, then the \${HOMEglobal}/dev/ci/cases/pr
        directory is used.
 
     -G Run all valid GFS cases in the specified YAML directory.
@@ -51,8 +53,12 @@ function _usage() {
 
     -A "HPC account name"  Set the HPC account name.
        If this is not set, the default in
-       \$HOMEgfs/dev/ci/platform/config.\$machine
+       \$HOMEglobal/dev/ci/platform/config.\$machine
        will be used.
+
+    -I "/path/to/base_ic"  Override BASE_IC for all cases.
+       If this is not set, BASE_IC is read from the hosts YAML
+       (\$HOMEglobal/dev/workflow/hosts/\$machine.yaml).
 
     -c Append the chosen set of tests to your existing crontab
        If this option is not chosen, the new entries that would have been
@@ -80,15 +86,19 @@ EOF
 
 set -eu
 
+# --------------------------------------------------------------------------- #
+# Defaults and Runtime State
+# --------------------------------------------------------------------------- #
 # Set default options
-HOMEgfs=""
+HOMEglobal=""
 _specified_home=false
 _build=false
+_compute_build=false
 _build_flags=""
 _update_submods=false
-declare -a _yaml_list=("C48_ATM")
+declare -a _yaml_list=()
 _specified_yaml_list=false
-_yaml_dir=""  # Will be set based off of HOMEgfs if not specified explicitly
+_yaml_dir="" # Will be set based off of HOMEglobal if not specified explicitly
 _specified_yaml_dir=false
 _run_all_gfs=false
 _run_all_gefs=false
@@ -96,6 +106,8 @@ _run_all_sfs=false
 _run_all_gcafs=false
 _hpc_account=""
 _set_account=false
+_base_ic=""
+_set_base_ic=false
 _update_cron=false
 _email=""
 _tag=""
@@ -108,118 +120,170 @@ _cwd=$(pwd)
 _runtests="${RUNTESTS:-${_runtests:-}}"
 _auto_del=false
 _nonflag_option_count=0
+_use_scron=false
+declare -a _scron_sh_files=()
+# --------------------------------------------------------------------------- #
+# Argument Parsing
+# --------------------------------------------------------------------------- #
 
-while [[ $# -gt 0 && "$1" != "--" ]]; do
-   while getopts ":H:bDuy:Y:GESCA:ce:t:vVdh" option; do
-      case "${option}" in
+function _set_yaml_list_from_arg() {
+    # Start over with an empty list and normalize names to no .yaml suffix.
+    _yaml_list=()
+    for _yaml in ${OPTARG}; do
+        _yaml_list+=("${_yaml//.yaml/}")
+    done
+    _specified_yaml_list=true
+}
+
+function _parse_option() {
+    case "${option}" in
+        # Core paths and build mode
         H)
-           HOMEgfs="${OPTARG}"
-           _specified_home=true
-           if [[ ! -d "${HOMEgfs}" ]]; then
-              echo "Specified HOMEgfs directory (${HOMEgfs}) does not exist"
-              exit 1
-           fi
-           ;;
+            HOMEglobal="${OPTARG}"
+            _specified_home=true
+            if [[ ! -d "${HOMEglobal}" ]]; then
+                echo "Specified HOMEglobal directory (${HOMEglobal}) does not exist"
+                exit 1
+            fi
+            ;;
         b) _build=true ;;
+        B) _build=true && _compute_build=true ;;
         D) _auto_del=true ;;
         u) _update_submods=true ;;
-        y) # Start over with an empty _yaml_list
-           declare -a _yaml_list=()
-           for _yaml in ${OPTARG}; do
-              # Strip .yaml from the end of each and append to _yaml_list
-              _yaml_list+=("${_yaml//.yaml/}")
-           done
-           _specified_yaml_list=true
-           ;;
+
+        # Test/case selection
+        y) _set_yaml_list_from_arg ;;
         Y) _yaml_dir="${OPTARG}" && _specified_yaml_dir=true ;;
         G) _run_all_gfs=true ;;
         E) _run_all_gefs=true ;;
         S) _run_all_sfs=true ;;
         C) _run_all_gcafs=true ;;
+
+        # Workflow behavior and notifications
         c) _update_cron=true ;;
         e) _email="${OPTARG}" && _set_email=true ;;
         t) _tag="_${OPTARG}" ;;
+        I) _set_base_ic=true && _base_ic="${OPTARG}" ;;
+
+        # Logging/debug
         v) _verbose=true ;;
         V) _very_verbose=true && _verbose=true && _verbose_flag="-v" ;;
-        A) _set_account=true && _hpc_account="${OPTARG}" ;;
         d) _debug=true && _very_verbose=true && _verbose=true && _verbose_flag="-v" && PS4='${LINENO}: ' ;;
+
+        # HPC account and usage
+        A) _set_account=true && _hpc_account="${OPTARG}" ;;
         h) _usage && exit 0 ;;
+
         :)
-          echo "[${BASH_SOURCE[0]}]: ${option} requires an argument"
-          _usage
-          exit 1
-          ;;
+            echo "[${BASH_SOURCE[0]}]: ${option} requires an argument"
+            _usage
+            exit 1
+            ;;
         *)
-          echo "[${BASH_SOURCE[0]}]: Unrecognized option: ${option}"
-          _usage
-          exit 1
-          ;;
-      esac
-   done
+            echo "[${BASH_SOURCE[0]}]: Unrecognized option: ${option}"
+            _usage
+            exit 1
+            ;;
+    esac
+}
 
-   if [[ ${OPTIND:-0} -gt 0 ]]; then
-      shift $((OPTIND-1))
-   fi
+function _parse_args() {
+    while [[ $# -gt 0 && "$1" != "--" ]]; do
+        while getopts ":H:bBDuy:Y:GESCA:I:ce:t:vVdh" option; do
+            _parse_option
+        done
 
-   while [[ $# -gt 0 && ! "$1" =~ ^- ]]; do
-      _runtests=${1}
-      (( _nonflag_option_count += 1 ))
-      if [[ ${_nonflag_option_count} -gt 1 ]]; then
-         echo "Too many arguments specified."
-         _usage
-         exit 2
-      fi
-      shift
-   done
-done
+        if [[ ${OPTIND:-0} -gt 0 ]]; then
+            shift $((OPTIND - 1))
+            OPTIND=1
+        fi
+
+        while [[ $# -gt 0 && ! "$1" =~ ^- ]]; do
+            _runtests=${1}
+            ((_nonflag_option_count += 1))
+            if [[ ${_nonflag_option_count} -gt 1 ]]; then
+                echo "Too many arguments specified."
+                _usage
+                exit 2
+            fi
+            shift
+        done
+    done
+}
+
+_parse_args "$@"
+
+# --------------------------------------------------------------------------- #
+# Common Helpers
+# --------------------------------------------------------------------------- #
 
 function send_email() {
-   # Send an email to $_email.
-   # Only use this once we get to the long steps (building, etc) and on success.
-   _subject="${_subject:-generate_workflows.sh failure on ${machine}}"
-   _body="${1}"
+    # Send an email to $_email.
+    # Only use this once we get to the long steps (building, etc) and on success.
+    _subject="${_subject:-generate_workflows.sh failure on ${machine}}"
+    _body="${1}"
 
-   echo "${_body}" | mail -s "${_subject}" "${_email}"
+    echo "${_body}" | mail -s "${_subject}" "${_email}"
 }
+
+# Function to notify user about REPLYTO for scrontab workflows
+function mail_warning() {
+    if [[ "${_use_scron}" == true && "${_set_email}" == false && -z "${REPLYTO:-}" ]]; then
+        echo -e "\033[0;33mWARNING:\033[0m Set \033[0;32mexport REPLYTO=\"your_email\"\033[0m in your .bashrc or use generate_workflows.sh with \033[0;32m-e \"your_email\"\033[0m to receive job failure notifications."
+    fi
+}
+
+# Export REPLYTO if email was provided via -e flag and is not empty
+if [[ "${_set_email}" == "true" && -n "${_email}" ]]; then
+    export REPLYTO="${_email}"
+fi
 
 function delete_dir() {
-   local dir_to_rm="${1:-}"
-   if [[ -z "${dir_to_rm}" ]]; then
-      echo "Invalid call to delete_dir"
-      exit 8
-   fi
+    local dir_to_rm="${1:-}"
+    if [[ -z "${dir_to_rm}" ]]; then
+        echo "Invalid call to delete_dir"
+        exit 8
+    fi
 
-   echo "Would you like to remove ${dir_to_rm}?"
-   _attempts=0
-   while read -r _from_stdin; do
-      if [[ "${_from_stdin^^}" =~ Y ]]; then
-         rm -rf "${dir_to_rm}"
-         break
-      elif [[ "${_from_stdin^^}" =~ N ]]; then
-         echo "Continuing without removing the directory"
-         break
-      else
-         (( _attempts+=1 ))
-         if [[ ${_attempts} == 3 ]]; then
-            echo "Exiting."
-            exit 99
-         fi
-         echo "'${_from_stdin}' is not a valid choice.  Please type Y or N"
-      fi
-   done
+    echo "Would you like to remove ${dir_to_rm}?"
+    _attempts=0
+    while read -r _from_stdin; do
+        if [[ "${_from_stdin^^}" =~ Y ]]; then
+            rm -rf "${dir_to_rm}"
+            break
+        elif [[ "${_from_stdin^^}" =~ N ]]; then
+            echo "Continuing without removing the directory"
+            break
+        else
+            ((_attempts += 1))
+            if [[ ${_attempts} == 3 ]]; then
+                echo "Exiting."
+                exit 99
+            fi
+            echo "'${_from_stdin}' is not a valid choice.  Please type Y or N"
+        fi
+    done
 }
 
+# --------------------------------------------------------------------------- #
+# Validate Required Inputs
+# --------------------------------------------------------------------------- #
+
 if [[ -z "${_runtests}" ]]; then
-   echo "Missing run directory (RUNTESTS) argument/environment variable."
-   sleep 2
-   _usage
-   exit 3
+    echo "Missing run directory (RUNTESTS) argument/environment variable."
+    sleep 2
+    _usage
+    exit 3
 fi
 
 # Turn on logging if running in debug mode
 if [[ "${_debug}" == "true" ]]; then
-   set -x
+    set -x
 fi
+
+# --------------------------------------------------------------------------- #
+# Prepare RUNTESTS Directory
+# --------------------------------------------------------------------------- #
 
 # Create the RUNTESTS directory
 # Start by getting the full path
@@ -228,179 +292,208 @@ if [[ "${_verbose}" == "true" ]]; then
     printf "Creating RUNTESTS in %s\n\n" "${_runtests}"
 fi
 if [[ ! -d "${_runtests}" ]]; then
-   set +e
-   if ! mkdir -p "${_runtests}" "${_verbose_flag}"; then
-      echo "Unable to create RUNTESTS directory: ${_runtests}"
-      echo "Rerun with -h for usage examples."
-      exit 4
-   fi
-   set -e
+    set +e
+    if ! mkdir -p "${_runtests}" "${_verbose_flag}"; then
+        echo "Unable to create RUNTESTS directory: ${_runtests}"
+        echo "Rerun with -h for usage examples."
+        exit 4
+    fi
+    set -e
 else
-   echo "The RUNTESTS directory ${_runtests} already exists."
-   if [[ "${_auto_del}" == "true" ]]; then
-      echo "Removing."
-      rm -rf "${_runtests}"
-   else
-      delete_dir "${_runtests}"
-   fi
+    echo "The RUNTESTS directory ${_runtests} already exists."
+    if [[ "${_auto_del}" == "true" ]]; then
+        echo "Removing."
+        rm -rf "${_runtests}"
+    else
+        delete_dir "${_runtests}"
+    fi
+fi
+
+# --------------------------------------------------------------------------- #
+# Resolve Initial Case Selection
+# --------------------------------------------------------------------------- #
+
+# Check that at least one case was selected via -y or -G, -E, -S, -C
+if [[ "${_specified_yaml_list}" == "false" && "${_run_all_gfs}" == "false" &&
+    "${_run_all_gefs}" == "false" && "${_run_all_gcafs}" == "false" &&
+    "${_run_all_sfs}" == "false" ]]; then
+
+    echo "No cases selected to run!"
+    echo "Please select which case(s) to run explicitly with -y \"list of case(s)\" or"
+    echo "by specifying -G (all GFS), -E (all GEFS), -C (all GCAFS) and/or -S (all SFS)."
+    exit 3
 fi
 
 # Empty the _yaml_list array if -G, -E, -S and/or -C were selected
-if [[ "${_run_all_gfs}" == "true" || \
-      "${_run_all_gefs}" == "true" || \
-      "${_run_all_gcafs}" == "true" || \
-      "${_run_all_sfs}" == "true" ]]; then
+if [[ "${_run_all_gfs}" == "true" ||
+    "${_run_all_gefs}" == "true" ||
+    "${_run_all_gcafs}" == "true" ||
+    "${_run_all_sfs}" == "true" ]]; then
 
-   # Raise an error if the user specified a yaml list and any of -G -E -S -C
-   if [[ "${_specified_yaml_list}" == "true" ]]; then
-      echo "Ambiguous case selection."
-      echo "Please select which tests to run explicitly with -y \"list of tests\" or"
-      echo "by specifying -G (all GFS), -E (all GEFS), -C (all GCAFS) and/or -S (all SFS), but not both."
-      exit 3
-   fi
+    # Raise an error if the user specified a yaml list and any of -G -E -S -C
+    if [[ "${_specified_yaml_list}" == "true" ]]; then
+        echo "Ambiguous case selection."
+        echo "Please select which tests to run explicitly with -y \"list of tests\" or"
+        echo "by specifying -G (all GFS), -E (all GEFS), -C (all GCAFS) and/or -S (all SFS), but not both."
+        exit 3
+    fi
 
-   _yaml_list=()
 fi
 
-# Set HOMEgfs if it wasn't set by the user
+# Set HOMEglobal if it wasn't set by the user
 if [[ "${_specified_home}" == "false" ]]; then
-   script_relpath="$(dirname "${BASH_SOURCE[0]}")"
-   HOMEgfs="$(cd "${script_relpath}/../.." && pwd)"
-   if [[ "${_verbose}" == "true" ]]; then
-       printf "Setting HOMEgfs to %s\n\n" "${HOMEgfs}"
-   fi
+    script_relpath="$(dirname "${BASH_SOURCE[0]}")"
+    HOMEglobal="$(cd "${script_relpath}" && git rev-parse --show-toplevel)"
+    if [[ "${_verbose}" == "true" ]]; then
+        printf "Setting HOMEglobal to %s\n\n" "${HOMEglobal}"
+    fi
 fi
 
-# Set the _yaml_dir to HOMEgfs/dev/ci/cases/pr if not explicitly set
+# Set the _yaml_dir to HOMEglobal/dev/ci/cases/pr if not explicitly set
 if [[ "${_specified_yaml_dir}" == false ]]; then
-    _yaml_dir="${HOMEgfs}/dev/ci/cases/pr"
+    _yaml_dir="${HOMEglobal}/dev/ci/cases/pr"
 fi
 
-function select_all_yamls()
-{
-   # A helper function to select all of the YAMLs for a specified system (gfs, gefs, sfs)
+# --------------------------------------------------------------------------- #
+# Case Discovery Helper
+# --------------------------------------------------------------------------- #
 
-   # This function is called if -G, -E, or -S are specified either with or without a
-   # specified YAML list.  If a YAML list was specified, this function will remove any
-   # YAMLs in that list that are not for the specified system and issue warnings when
-   # doing so.
+function select_all_yamls() {
+    # A helper function to select all of the YAMLs for a specified system (gfs, gefs, sfs)
 
-   _net="${1}"
+    # This function is called if -G, -E, or -S are specified either with or without a
+    # specified YAML list.  If a YAML list was specified, this function will remove any
+    # YAMLs in that list that are not for the specified system and issue warnings when
+    # doing so.
 
-   # Bash cannot return an array from a function and any edits are descoped at
-   # the end of the function, so use a nameref instead.
-   local -n _nameref_yaml_list="${2}"
+    _net="${1}"
 
-   if [[ "${_specified_yaml_list}" == false ]]; then
-      # Start over with an empty _yaml_list
-      _nameref_yaml_list=()
-      printf "Running all %s cases in %s\n\n" "${_net^^}" "${_yaml_dir}"
-      _yaml_count=0
+    # Bash cannot return an array from a function and any edits are descoped at
+    # the end of the function, so use a nameref instead.
+    local -n _nameref_yaml_list="${2}"
 
-      for _full_path in "${_yaml_dir}/"*.yaml; do
-         # Skip any YAML that isn't supported
-         if ! grep -l "net: *${_net}" "${_full_path}" >& /dev/null ; then continue; fi
+    if [[ "${_specified_yaml_list}" == false ]]; then
+        # Start over with an empty _yaml_list
+        _nameref_yaml_list=()
+        printf "Running all %s cases in %s\n\n" "${_net^^}" "${_yaml_dir}"
+        _yaml_count=0
 
-         # Select only cases for the specified system
-         _yaml=$(basename "${_full_path}")
-         # Strip .yaml from the filename to get the case name
-         _yaml="${_yaml//.yaml/}"
-         _nameref_yaml_list+=("${_yaml}")
-         if [[ "${_verbose}" == true ]]; then
-             echo "Found test ${_yaml//.yaml/}"
-         fi
-         (( _yaml_count+=1 ))
-      done
+        for _full_path in "${_yaml_dir}/"*.yaml; do
+            # Skip any YAML that isn't supported
+            if ! grep -l "net: *${_net}" "${_full_path}" >&/dev/null; then continue; fi
 
-      if [[ ${_yaml_count} -eq 0 ]]; then
-         read -r -d '' _message << EOM
+            # Select only cases for the specified system
+            _yaml=$(basename "${_full_path}")
+            # Strip .yaml from the filename to get the case name
+            _yaml="${_yaml//.yaml/}"
+            _nameref_yaml_list+=("${_yaml}")
+            if [[ "${_verbose}" == true ]]; then
+                echo "Found test ${_yaml//.yaml/}"
+            fi
+            ((_yaml_count += 1))
+        done
+
+        if [[ ${_yaml_count} -eq 0 ]]; then
+            read -r -d '' _message << EOM
             "No YAMLs or ${_net^^} were found in the directory (${_yaml_dir})!"
             "Please check the directory/YAMLs and try again"
 EOM
-         echo "${_message}"
-         if [[ "${_set_email}" == true ]]; then
-            send_email "${_message}"
-         fi
-         exit 6
-      fi
-   else
-      # Check if the specified yamls are for the specified system
-      for i in "${!_nameref_yaml_list}"; do
-         _yaml="${_nameref_yaml_list[${i}]}"
-         _found=$(grep -l "net: *${_net}" "${_yaml_dir}/${_yaml}.yaml")
-         if [[ -z "${_found}" ]]; then
-            echo "WARNING: the yaml file ${_yaml_dir}/${_yaml}.yaml is not designed for the ${_net^^} system"
-            echo "Removing this yaml from the set of cases to run"
-            unset '_nameref_yaml_list[${i}]'
-            # Sleep 2 seconds to give the user a moment to react
-            sleep 2s
-         fi
-      done
-   fi
+            echo "${_message}"
+            if [[ "${_set_email}" == true ]]; then
+                send_email "${_message}"
+            fi
+            exit 6
+        fi
+    else
+        # Check if the specified yamls are for the specified system
+        for i in "${!_nameref_yaml_list}"; do
+            _yaml="${_nameref_yaml_list[${i}]}"
+            _found=$(grep -l "net: *${_net}" "${_yaml_dir}/${_yaml}.yaml")
+            if [[ -z "${_found}" ]]; then
+                echo "WARNING: the yaml file ${_yaml_dir}/${_yaml}.yaml is not designed for the ${_net^^} system"
+                echo "Removing this yaml from the set of cases to run"
+                unset '_nameref_yaml_list[${i}]'
+                # Sleep 2 seconds to give the user a moment to react
+                sleep 2s
+            fi
+        done
+    fi
 }
+
+# --------------------------------------------------------------------------- #
+# Expand Case List By System Flags
+# --------------------------------------------------------------------------- #
 
 # Check if running all GEFS cases
 if [[ "${_run_all_gefs}" == "true" ]]; then
-   # Append -w to build_all.sh flags if -E was specified
-   _build_flags="${_build_flags} gefs "
+    # Append -w to build_all.sh flags if -E was specified
+    _build_flags="${_build_flags} gefs "
 
-   declare -a _gefs_yaml_list
-   select_all_yamls "gefs" "_gefs_yaml_list"
-   _yaml_list=("${_yaml_list[@]}" "${_gefs_yaml_list[@]}")
+    declare -a _gefs_yaml_list
+    select_all_yamls "gefs" "_gefs_yaml_list"
+    _yaml_list=("${_yaml_list[@]}" "${_gefs_yaml_list[@]}")
 fi
 
 # Check if running all GFS cases
 if [[ "${_run_all_gfs}" == "true" ]]; then
-   _build_flags="${_build_flags} gfs gsi gdas "
+    _build_flags="${_build_flags} gfs gsi gdas "
 
-   declare -a _gfs_yaml_list
-   select_all_yamls "gfs" "_gfs_yaml_list"
-   _yaml_list=("${_yaml_list[@]}" "${_gfs_yaml_list[@]}")
+    declare -a _gfs_yaml_list
+    select_all_yamls "gfs" "_gfs_yaml_list"
+    _yaml_list=("${_yaml_list[@]}" "${_gfs_yaml_list[@]}")
 fi
 
 # Check if running all SFS cases
 if [[ "${_run_all_sfs}" == "true" ]]; then
-   _build_flags="${_build_flags} sfs "
+    _build_flags="${_build_flags} sfs "
 
-   declare -a _gfs_yaml_list
-   select_all_yamls "sfs" "_sfs_yaml_list"
-   _yaml_list=("${_yaml_list[@]}" "${_sfs_yaml_list[@]}")
+    declare -a _gfs_yaml_list
+    select_all_yamls "sfs" "_sfs_yaml_list"
+    _yaml_list=("${_yaml_list[@]}" "${_sfs_yaml_list[@]}")
 fi
 
 # Check if running all GCAFS cases
 if [[ "${_run_all_gcafs}" == "true" ]]; then
-   _build_flags="${_build_flags} gcafs gdas "
+    _build_flags="${_build_flags} gcafs gdas "
 
-   declare -a _gfs_yaml_list
-   select_all_yamls "gcafs" "_gcafs_yaml_list"
-   _yaml_list=("${_yaml_list[@]}" "${_gcafs_yaml_list[@]}")
+    declare -a _gfs_yaml_list
+    select_all_yamls "gcafs" "_gcafs_yaml_list"
+    _yaml_list=("${_yaml_list[@]}" "${_gcafs_yaml_list[@]}")
 fi
+
+# --------------------------------------------------------------------------- #
+# Optional Submodule Update
+# --------------------------------------------------------------------------- #
 
 # Update submodules if requested
 if [[ "${_update_submods}" == "true" ]]; then
-   printf "Updating submodules\n\n"
-   _git_cmd="git submodule update --init --recursive -j 10"
-   if [[ "${_verbose}" == true ]]; then
-      ${_git_cmd}
-   else
-      if ! ${_git_cmd} 2> stderr 1> stdout; then
-         cat stdout stderr
-         read -r -d '' _message << EOM
+    printf "Updating submodules\n\n"
+    _git_cmd="git submodule update --init --recursive -j 10"
+    if [[ "${_verbose}" == true ]]; then
+        ${_git_cmd}
+    else
+        if ! ${_git_cmd} 2> stderr 1> stdout; then
+            cat stdout stderr
+            read -r -d '' _message << EOM
 The git command (${_git_cmd}) failed with a non-zero status
 Messages from git:
 EOM
-         _newline=$'\n'
-         _message="${_message}${_newline}$(cat stdout stderr)"
-         if [[ "${_set_email}" == true ]]; then
-            send_email "${_message}"
-         fi
-         echo "${_message}"
-         rm -f stdout stderr
-         exit 8
-      fi
-      rm -f stdout stderr
-   fi
+            _newline=$'\n'
+            _message="${_message}${_newline}$(cat stdout stderr)"
+            if [[ "${_set_email}" == true ]]; then
+                send_email "${_message}"
+            fi
+            echo "${_message}"
+            rm -f stdout stderr
+            exit 8
+        fi
+        rm -f stdout stderr
+    fi
 fi
+
+# --------------------------------------------------------------------------- #
+# Load Workflow Environment
+# --------------------------------------------------------------------------- #
 
 # Loading modules sometimes raises unassigned errors, so disable checks
 set +u
@@ -410,10 +503,10 @@ fi
 if [[ "${_debug}" == "true" ]]; then
     set +x
 fi
-if ! source "${HOMEgfs}/dev/ush/gw_setup.sh" >& stdout; then
-   cat stdout
-   echo "Failed to source ${HOMEgfs}/dev/ush/gw_setup.sh!"
-   exit 7
+if ! source "${HOMEglobal}/dev/ush/gw_setup.sh" >&stdout; then
+    cat stdout
+    echo "Failed to source ${HOMEglobal}/dev/ush/gw_setup.sh!"
+    exit 7
 fi
 if [[ "${_verbose}" == "true" ]]; then
     cat stdout
@@ -424,215 +517,368 @@ if [[ "${_debug}" == "true" ]]; then
 fi
 set -u
 machine=${MACHINE_ID}
-platform_config="${HOMEgfs}/dev/ci/platforms/config.${machine}"
-if [[ -f "${platform_config}" ]]; then
-    source "${HOMEgfs}/dev/ci/platforms/config.${machine}"
-else
-   if [[ "${_set_account}" == "false" ]] ; then
-      echo "ERROR Unknown HPC account!  Please use the -A option to specify."
-      exit 11
-   fi
+
+# If _yaml_dir is not set, set it to $HOMEglobal/dev/ci/cases/pr
+if [[ -z ${_yaml_dir} ]]; then
+    _yaml_dir="${HOMEglobal}/dev/ci/cases/pr"
 fi
 
-# If _yaml_dir is not set, set it to $HOMEgfs/dev/ci/cases/pr
-if [[ -z ${_yaml_dir} ]]; then
-   _yaml_dir="${HOMEgfs}/dev/ci/cases/pr"
+# --------------------------------------------------------------------------- #
+# Resolve HPC Account
+# --------------------------------------------------------------------------- #
+
+# Update the account: -A flag > existing env var > platform config default
+if [[ "${_set_account}" == true ]]; then
+    export HPC_ACCOUNT="${_hpc_account}"
+    if [[ "${_verbose}" == true ]]; then
+        printf "Setting HPC account to %s\n\n" "${HPC_ACCOUNT}"
+    fi
+elif [[ -z "${HPC_ACCOUNT:-}" ]]; then
+    platform_config="${HOMEglobal}/dev/ci/platforms/config.${machine}"
+    if [[ -f "${platform_config}" ]]; then
+        _platform_account=$(sed -n "s/^export HPC_ACCOUNT=\${HPC_ACCOUNT:-\([^}]*\)}.*/\1/p" "${platform_config}")
+        export HPC_ACCOUNT="${_platform_account}"
+        if [[ "${_verbose}" == true ]]; then
+            printf "Setting HPC account to %s from platform config\n\n" "${HPC_ACCOUNT}"
+        fi
+    else
+        echo "ERROR Unknown HPC account! Please use the -A option to specify."
+        exit 11
+    fi
 fi
+
+# --------------------------------------------------------------------------- #
+# Build and Link Workflow
+# --------------------------------------------------------------------------- #
 
 # Build the system if requested
 if [[ "${_build}" == "true" ]]; then
-   printf "Building via build_all.sh %s\n\n" "${_build_flags}"
-   # Let the output of build_all.sh go to stdout regardless of verbose options
-   #shellcheck disable=SC2086,SC2248
-   ${HOMEgfs}/sorc/build_all.sh ${_verbose_flag} ${_build_flags}
+    printf "Building via build_all.sh %s\n\n" "${_build_flags}"
+    # Let the output of build_all.sh go to stdout regardless of verbose options
+    if [[ "${_compute_build}" == true ]]; then
+        if [[ -z "${HPC_ACCOUNT:-}" ]]; then
+            echo "ERROR Unknown HPC account!  Please use the -A option to specify."
+            exit 11
+        fi
+        _compute_build_flag="-c -A ${HPC_ACCOUNT}"
+    fi
+    #shellcheck disable=SC2086,SC2248
+    ${HOMEglobal}/sorc/build_all.sh ${_compute_build_flag:-} ${_verbose_flag} ${_build_flags}
 fi
 
 # Link the workflow silently unless there's an error
 if [[ "${_verbose}" == true ]]; then
     printf "Linking the workflow\n\n"
 fi
-if ! "${HOMEgfs}/sorc/link_workflow.sh" >& stdout; then
-   cat stdout
-   echo "link_workflow.sh failed!"
-   if [[ "${_set_email}" == true ]]; then
-      _stdout=$(cat stdout)
-      send_email "link_workflow.sh failed with the message"$'\n'"${_stdout}"
-   fi
-   rm -f stdout
-   exit 9
+if ! "${HOMEglobal}/sorc/link_workflow.sh" >&stdout; then
+    cat stdout
+    echo "link_workflow.sh failed!"
+    if [[ "${_set_email}" == true ]]; then
+        _stdout=$(cat stdout)
+        send_email "link_workflow.sh failed with the message"$'\n'"${_stdout}"
+    fi
+    rm -f stdout
+    exit 9
 fi
 rm -f stdout
+
+# --------------------------------------------------------------------------- #
+# Validate YAML Inputs For This Host
+# --------------------------------------------------------------------------- #
 
 # Configure the environment for running create_experiment.py
 if [[ "${_verbose}" == true ]]; then
     printf "Setting up the environment to run create_experiment.py\n\n"
 fi
 for i in "${!_yaml_list[@]}"; do
-   _yaml_file="${_yaml_dir}/${_yaml_list[${i}]}.yaml"
-   # Verify that the YAMLs are where we are pointed
-   if [[ ! -s "${_yaml_file}" ]]; then
-      echo "The YAML file ${_yaml_file} does not exist!"
-      echo "Please check the input yaml list and directory."
-      if [[ "${_set_email}" == true ]]; then
-         read -r -d '' _message << EOM
+    _yaml_file="${_yaml_dir}/${_yaml_list[${i}]}.yaml"
+    # Verify that the YAMLs are where we are pointed
+    if [[ ! -s "${_yaml_file}" ]]; then
+        echo "The YAML file ${_yaml_file} does not exist!"
+        echo "Please check the input yaml list and directory."
+        if [[ "${_set_email}" == true ]]; then
+            read -r -d '' _message << EOM
          generate_workflows.sh failed to find one of the specified YAMLs (${_yaml_file})
          in the specified YAML directory (${_yaml_dir}).
 EOM
-         send_email "${_message}"
-      fi
-      exit 10
-   fi
+            send_email "${_message}"
+        fi
+        exit 10
+    fi
 
-   # Strip any unsupported tests
-   _unsupported_systems=$(sed '1,/skip_ci_on_hosts/ d' "${_yaml_file}")
+    # Strip any unsupported tests
+    _unsupported_systems=$(sed '1,/skip_ci_on_hosts/ d' "${_yaml_file}")
 
-   for _system in ${_unsupported_systems}; do
-      if [[ "${_system}" =~ ${machine} ]]; then
-         if [[ "${_specified_yaml_list}" == true ]]; then
-            printf "WARNING %s is unsupported on %s, removing from case list\n\n" "${_yaml}" "${machine}"
-            if [[ "${_set_email}" == true ]]; then
-               _final_message="${_final_message:-}"$'\n'"The specified YAML case ${_yaml} is not supported on ${machine} and was skipped."
+    for _system in ${_unsupported_systems}; do
+        if [[ "${_system}" =~ ${machine} ]]; then
+            if [[ "${_specified_yaml_list}" == true ]]; then
+                printf "WARNING %s is unsupported on %s, removing from case list\n\n" "${_yaml}" "${machine}"
+                if [[ "${_set_email}" == true ]]; then
+                    _final_message="${_final_message:-}"$'\n'"The specified YAML case ${_yaml} is not supported on ${machine} and was skipped."
+                fi
+                # Sleep so the user has a moment to notice
+                sleep 2s
             fi
-            # Sleep so the user has a moment to notice
-            sleep 2s
-         fi
-         unset '_yaml_list[${i}]'
-         break
-      fi
-   done
+            unset '_yaml_list[${i}]'
+            break
+        fi
+    done
 done
 
-# Update the account if specified
-if [[ "${_set_account}" == true ]] ; then
-   export HPC_ACCOUNT=${_hpc_account}
-   if [[ "${_verbose}" == true ]]; then
-      printf "Setting HPC account to %s\n\n" "${HPC_ACCOUNT}"
-   fi
+# --------------------------------------------------------------------------- #
+# Apply BASE_IC Override
+# --------------------------------------------------------------------------- #
+
+# Override BASE_IC if specified via -I
+if [[ "${_set_base_ic}" == true ]]; then
+    export BASE_IC="${_base_ic}"
+    if [[ "${_verbose}" == true ]]; then
+        printf "Overriding BASE_IC to %s\n\n" "${BASE_IC}"
+    fi
 fi
+
+# --------------------------------------------------------------------------- #
+# Create Experiments and Collect Schedule Entries
+# --------------------------------------------------------------------------- #
 
 # Create the experiments
 rm -f "tests.cron" "${_verbose_flag}"
 echo "Running create_experiment.py for ${#_yaml_list[@]} cases"
 
 if [[ "${_verbose}" == true ]]; then
-   printf "Selected cases: %s\n\n" "${_yaml_list[*]}"
+    printf "Selected cases: %s\n\n" "${_yaml_list[*]}"
 fi
 for _case in "${_yaml_list[@]}"; do
-   if [[ "${_verbose}" == false ]]; then
-      echo "${_case}"
-   fi
-   _pslot="${_case}${_tag}"
-   _create_exp_cmd="./create_experiment.py -y ${_yaml_dir}/${_case}.yaml --overwrite"
-   if [[ "${_verbose}" == true ]]; then
-      pslot=${_pslot} RUNTESTS=${_runtests} ${_create_exp_cmd}
-   else
-      if ! pslot=${_pslot} RUNTESTS=${_runtests} ${_create_exp_cmd} 2> stderr 1> stdout; then
-         _output=$(cat stdout stderr)
-         _message="The create_experiment command (${_create_exp_cmd}) failed with a non-zero status.  Output:"
-         _message="${_message}"$'\n'"${_output}"
-         if [[ "${_set_email}" == true ]]; then
-            send_email "${_message}"
-         fi
-         echo "${_message}"
-         rm -f stdout stderr
-         exit 12
-      fi
-      rm -f stdout stderr
-   fi
+    if [[ "${_verbose}" == false ]]; then
+        echo "${_case}"
+    fi
+    _pslot="${_case}${_tag}"
+    _create_exp_cmd="./create_experiment.py -y ${_yaml_dir}/${_case}.yaml --overwrite"
+    if [[ "${_verbose}" == true ]]; then
+        pslot=${_pslot} RUNTESTS=${_runtests} ${_create_exp_cmd}
+    else
+        if ! pslot=${_pslot} RUNTESTS=${_runtests} ${_create_exp_cmd} 2> stderr 1> stdout; then
+            _output=$(cat stdout stderr)
+            _message="The create_experiment command (${_create_exp_cmd}) failed with a non-zero status.  Output:"
+            _message="${_message}"$'\n'"${_output}"
+            if [[ "${_set_email}" == true ]]; then
+                send_email "${_message}"
+            fi
+            echo "${_message}"
+            rm -f stdout stderr
+            exit 12
+        fi
+        rm -f stdout stderr
+    fi
 
-   # Check if DATAROOT is already present; eval will return just DATAROOT from the sourcing
-   # shellcheck disable=SC2312
-   eval "$(PDY=0 cyc=0 source "${_runtests}/EXPDIR/${_pslot}/config.base" >& /dev/null; echo _dataroot="${STMP}/RUNDIRS/${_pslot}")"
-   if [[ -d "${_dataroot}" ]]; then
-      echo "WARNING DATAROOT already exists for ${_pslot} in ${_dataroot}"
-      if [[ "${_auto_del}" == "true" ]]; then
-         echo "Deleting."
-         rm -rf "${_dataroot}"
-      else
-         delete_dir "${_dataroot}"
-      fi
+    # Check if DATAROOT is already present; eval will return just DATAROOT from the sourcing
+    eval "$(
+        PDY=0 cyc=0 source "${_runtests}/EXPDIR/${_pslot}/config.base" >&/dev/null
+        echo _dataroot="${STMP}/RUNDIRS/${_pslot}"
+    )"
+    if [[ -d "${_dataroot}" ]]; then
+        echo "WARNING DATAROOT already exists for ${_pslot} in ${_dataroot}"
+        if [[ "${_auto_del}" == "true" ]]; then
+            echo "Deleting."
+            rm -rf "${_dataroot}"
+        else
+            delete_dir "${_dataroot}"
+        fi
 
-      if [[ -d "${_dataroot}" ]]; then
-         echo "Exiting!"
-         exit 16
-      fi
-   fi
+        if [[ -d "${_dataroot}" ]]; then
+            echo "Exiting!"
+            exit 16
+        fi
+    fi
 
-   # Check if this experiment is using cron or scron
-   cron_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.crontab"
-   scron_sh_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.scron.sh"
-   if [[ -f "${scron_sh_file}" ]]; then
-      _use_scron=true
-      _crontab_cmd="scrontab"
-   elif [[ -f "${cron_file}" ]]; then
-      _use_scron=false
-      _crontab_cmd="crontab"
-   else
-      echo "Could not find a crontab file for case ${_pslot}!"
-      echo "Expected to find ${cron_file}"
-      exit 13
-   fi
+    # Check if this experiment is using cron or scron
+    cron_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.crontab"
+    scron_sh_file="${_runtests}/EXPDIR/${_pslot}/${_pslot}.scron.sh"
+    if [[ -f "${scron_sh_file}" ]]; then
+        _use_scron=true
+        _crontab_cmd="scrontab"
+    elif [[ -f "${cron_file}" ]]; then
+        _use_scron=false
+        _crontab_cmd="crontab"
+    else
+        echo "Could not find a crontab file for case ${_pslot}!"
+        echo "Expected to find ${cron_file}"
+        exit 13
+    fi
 
-   if [[ "${_use_scron}" == true ]]; then
-      {
-      grep "^#.*${_pslot}" "${_runtests}/EXPDIR/${_pslot}/${_pslot}.crontab"
-      grep "^#SCRON" "${cron_file}"
-      grep "${scron_sh_file}" "${_runtests}/EXPDIR/${_pslot}/${_pslot}.crontab"
-      } >> tests.cron
-   else
-      grep "${_pslot}" "${_runtests}/EXPDIR/${_pslot}/${_pslot}.crontab" >> tests.cron
-   fi
+    if [[ "${_use_scron}" == true ]]; then
+        # Collect this experiment's scron script path; the master runner script
+        # will call them all sequentially to reduce simultaneous rocoto instances.
+        _scron_sh_files+=("${scron_sh_file}")
+    else
+        grep "${_pslot}" "${_runtests}/EXPDIR/${_pslot}/${_pslot}.crontab" >> tests.cron
+    fi
 done
 echo
 
+# --------------------------------------------------------------------------- #
+# Build Master Runner Script for scrontab (if using scron)
+# --------------------------------------------------------------------------- #
+
+# When running on a SLURM-managed scron system (e.g. Gaea), running all rocoto
+# instances simultaneously can exhaust head-node memory.  Instead, generate a
+# single master script that cycles through every experiment scron script
+# sequentially, and place only that one entry in the scrontab.
+if [[ "${_use_scron}" == true && ${#_scron_sh_files[@]} -gt 0 ]]; then
+    _master_script="${_runtests}/EXPDIR/rocoto_master_run.sh"
+    {
+        printf '%s\n' '#!/usr/bin/env bash'
+        printf '%s\n' '# Master runner script - cycles through all experiments sequentially'
+        printf '%s\n' '# to reduce simultaneous rocoto instances on the head node.'
+        for _scron_sh in "${_scron_sh_files[@]}"; do
+            printf 'if [[ -x "%s" ]]; then\n' "${_scron_sh}"
+            printf '    "%s"\n' "${_scron_sh}"
+            printf '%s\n' 'fi'
+        done
+    } > "${_master_script}"
+    chmod +x "${_master_script}"
+
+    # Guard: _yaml_list must be non-empty if _scron_sh_files is non-empty,
+    # but verify explicitly to surface any unexpected state.
+    if [[ ${#_yaml_list[@]} -eq 0 ]]; then
+        echo "ERROR: _yaml_list is empty but scron scripts were collected. This is unexpected."
+        exit 14
+    fi
+
+    # Pull partition and account from the first experiment's crontab (note that cases can be removed, so we must search)
+    _indexes=("${!_yaml_list[@]}")
+    _first_index="${_indexes[0]}"
+    _first_pslot="${_yaml_list[${_first_index}]}${_tag}"
+    _first_cron_file="${_runtests}/EXPDIR/${_first_pslot}/${_first_pslot}.crontab"
+    _master_log="${_runtests}/EXPDIR/rocoto_master_run.log"
+
+    _scron_partition=$(grep "^#SCRON --partition=" "${_first_cron_file}" | head -1)
+    _scron_account=$(grep "^#SCRON --account=" "${_first_cron_file}" | head -1)
+    if [[ -z "${_scron_partition}" || -z "${_scron_account}" ]]; then
+        echo "ERROR: Could not find #SCRON --partition= or #SCRON --account= in ${_first_cron_file}"
+        exit 15
+    fi
+
+    master_job_name="master_scron${_tag}"
+
+    {
+        echo
+        echo "#################### ${master_job_name} ####################"
+        echo "${_scron_partition}"
+        echo "${_scron_account}"
+        echo "#SCRON --job-name=${master_job_name}"
+        echo "#SCRON --output=${_master_log}"
+        echo "#SCRON --time=00:10:00"
+        echo "#SCRON --dependency=singleton"
+        echo "*/5 * * * * ${_master_script}"
+        echo "#################################################################"
+        echo
+    } >> tests.cron
+fi
+
+# --------------------------------------------------------------------------- #
+# Configure Mail Behavior
+# --------------------------------------------------------------------------- #
+
+# Add MAILTO to tests.cron for regular crontab
+if [[ "${_use_scron}" == false ]]; then
+    if [[ "${_set_email}" == "true" ]]; then
+        # Use email from -e flag
+        sed -i "1i MAILTO=\"${_email}\"" tests.cron
+    elif [[ -n "${REPLYTO:-}" ]]; then
+        # Use REPLYTO environment variable
+        sed -i "1i MAILTO=\"${REPLYTO}\"" tests.cron
+    else
+        # Use empty MAILTO
+        sed -i "1i MAILTO=\"\"" tests.cron
+    fi
+fi
+
+# --------------------------------------------------------------------------- #
+# Install or Print Scheduler Entries
+# --------------------------------------------------------------------------- #
+
 # Update the cron
 if [[ "${_update_cron}" == "true" ]]; then
-   printf "Updating the existing crontab\n\n"
-   echo
-   rm -f existing.cron final.cron "${_verbose_flag}"
-   touch existing.cron final.cron
+    printf "Updating the existing crontab\n\n"
+    echo
+    mail_warning
+    rm -f existing.cron final.cron "${_verbose_flag}"
+    touch existing.cron final.cron
 
-   ${_crontab_cmd} -l | grep -v "no crontab for" > existing.cron || true
+    ${_crontab_cmd} -l | grep -v "no crontab for" > existing.cron || true
 
-   if [[ "${_debug}" == "true" ]]; then
-      echo "Existing crontab: "
-      echo "#######################"
-      cat existing.cron
-      echo "#######################"
-   fi
+    if [[ "${_debug}" == "true" ]]; then
+        echo "Existing crontab: "
+        echo "#######################"
+        cat existing.cron
+        echo "#######################"
+    fi
 
-   if [[ "${_set_email}" == "true" ]]; then
-      # Replace the existing email in the crontab
-      if [[ "${_verbose}" == "true" ]]; then
-         printf "Updating crontab/scrontab email to %s\n\n" "${_email}"
-      fi
+    # Save existing MAILTO before removing it
+    existing_mailto=$(grep "^MAILTO=" existing.cron 2> /dev/null | head -1 || echo "")
 
-      if [[ "${_use_scron}" == true ]]; then
-         sed -i "s/.*--mail-user.*/#SCRON --mail-user=\"${_email}\"/" tests.cron
-      else
-         sed -i "s/^MAILTO.*/MAILTO=\"${_email}\"/" existing.cron
-      fi
-   fi
+    # Remove ALL MAILTO lines from existing.cron and tests.cron to prevent duplicates
+    sed -i '/^MAILTO=/d' existing.cron 2> /dev/null || true
+    sed -i '/^MAILTO=/d' tests.cron 2> /dev/null || true
 
-   cat existing.cron tests.cron >> final.cron
+    if [[ "${_set_email}" == "true" ]]; then
+        # For scrontab, REPLYTO is already exported earlier; for crontab, set MAILTO
+        if [[ "${_verbose}" == "true" ]]; then
+            printf "Updating crontab/scrontab email to %s\n\n" "${_email}"
+        fi
 
-   if [[ "${_verbose}" == "true" ]]; then
-      echo "Setting crontab to:"
-      echo "#######################"
-      cat final.cron
-      echo "#######################"
-   fi
+        if [[ "${_use_scron}" == false ]]; then
+            # For regular crontab, set MAILTO at the top of final.cron
+            echo "MAILTO=\"${_email}\"" > final.cron
+        fi
+    else
+        # Preserve existing MAILTO if present with non-empty value (only for regular crontab)
+        if [[ "${_use_scron}" == false ]]; then
+            # Check if there was a MAILTO with a non-empty value in the original crontab
+            # Extract the email value from MAILTO="email" or MAILTO=email
+            if [[ -n "${existing_mailto}" ]]; then
+                # Extract email value between quotes or after =
+                existing_email=$(echo "${existing_mailto}" | sed -n 's/^MAILTO=["'\'']*\([^"'\'']*\)["'\'']*$/\1/p')
+            else
+                existing_email=""
+            fi
 
-   ${_crontab_cmd} final.cron
+            if [[ -n "${existing_email}" ]]; then
+                echo "${existing_mailto}" > final.cron
+            elif [[ -n "${REPLYTO:-}" ]]; then
+                echo "MAILTO=\"${REPLYTO}\"" > final.cron
+            else
+                echo "MAILTO=\"\"" > final.cron
+            fi
+        fi
+    fi
+
+    cat existing.cron tests.cron >> final.cron
+
+    if [[ "${_verbose}" == "true" ]]; then
+        echo "Setting crontab to:"
+        echo "#######################"
+        cat final.cron
+        echo "#######################"
+    fi
+
+    ${_crontab_cmd} final.cron
 else
-   _message="Add the following to your crontab or scrontab to start running:"
-   _cron_tests=$(cat tests.cron)
-   _message="${_message}"$'\n'"${_cron_tests}"
-   echo "${_message}"
-   if [[ "${_set_email}" == true ]]; then
-      final_message="${final_message:-}"$'\n'"${_message}"
-   fi
+    mail_warning
+    _message="Add the following to your crontab or scrontab to start running:"
+    _cron_tests=$(cat tests.cron)
+    _message="${_message}"$'\n'"${_cron_tests}"
+    echo "${_message}"
+    echo
+    if [[ "${_set_email}" == true ]]; then
+        final_message="${final_message:-}"$'\n'"${_message}"
+    fi
 fi
+
+# --------------------------------------------------------------------------- #
+# Cleanup and Completion
+# --------------------------------------------------------------------------- #
 
 # Cleanup
 if [[ "${_debug}" == "false" ]]; then
@@ -641,6 +887,6 @@ fi
 
 echo "Success!!"
 if [[ "${_set_email}" == true && "${_debug}" == "true" ]]; then
-   final_message=$'Success!\n'"${final_message:-}"
-   _subject="generate_workflow.sh completed successfully" send_email "${final_message}"
+    final_message=$'Success!\n'"${final_message:-}"
+    _subject="generate_workflow.sh completed successfully" send_email "${final_message}"
 fi

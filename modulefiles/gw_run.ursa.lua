@@ -2,11 +2,11 @@ help([[
 Load environment to run GFS on Ursa
 ]])
 
--- Test that HOMEgfs is set.
+-- Test that HOMEglobal is set.
 -- If not, load_modules.sh was not sourced to load this module.
-local homegfssdir=os.getenv("HOMEgfs") or "None"
-if (homegfssdir == "None") then
-    LmodError("FATAL ERROR HOMEgfs variable is unset.\n" ..
+local homegfssdir=os.getenv("HOMEglobal") or "None"
+if (homegfssdir == "None" and mode() == "load") then
+    LmodError("FATAL ERROR HOMEglobal variable is unset.\n" ..
               "Please \"source dev/ush/load_modules.sh\" rather than loading this module directly.\n")
 end
 
@@ -18,6 +18,8 @@ load(pathJoin("prepobs", (os.getenv("prepobs_run_ver") or "None")))
 
 prepend_path("MODULEPATH", pathJoin("/scratch3/NCEPDEV/global/role.glopara/git/Fit2Obs/v" .. (os.getenv("fit2obs_ver") or "None"), "modulefiles"))
 load(pathJoin("fit2obs", (os.getenv("fit2obs_ver") or "None")))
+
+setenv("CRTM_FIX","/scratch3/NCEPDEV/global/role.glopara/fix/crtm/v2.4.0.2")
 
 whatis("Description: GFS run environment")
 

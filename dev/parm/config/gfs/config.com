@@ -3,6 +3,8 @@
 # shellcheck disable=SC2016
 echo "BEGIN: config.com"
 
+# TODO remove this config file. This will require removing all references to COM_*_TMPL variables in the workflow setup scripts.
+
 # These are just templates. All templates must use single quotations so variable
 #   expansion does not occur when this file is sourced. Substitution happens later
 #   during runtime. It is recommended to use the helper function `declare_from_tmpl()`,
@@ -37,22 +39,23 @@ echo "BEGIN: config.com"
 # shellcheck disable=SC2034
 if [[ "${RUN_ENVIR:-emc}" == "nco" ]]; then
     COM_OBSPROC_TMPL=$(compath.py "${envir}/obsproc/${obsproc_ver}")'/${RUN}.${YMD}/${HH}/atmos'
+    COM_OBSFORGE_TMPL=$(compath.py "${envir}/obsforge/${obsforge_ver}")'/${RUN}.${YMD}/${HH}/'
     COM_RTOFS_TMPL=$(compath.py "${envir}/rtofs/${rtofs_ver}")
     COM_TCVITAL_TMPL=$(compath.py "${envir}/gfs/${gfs_ver}")'/${RUN}.${YMD}/${HH}/atmos'
 else
     COM_OBSPROC_TMPL='${DMPDIR}/${RUN}${DUMP_SUFFIX}.${YMD}/${HH}/atmos'
+    COM_OBSFORGE_TMPL='${IODADIR}/${RUN}${DUMP_SUFFIX}.${YMD}/${HH}'
     COM_RTOFS_TMPL='${DMPDIR}'
     COM_TCVITAL_TMPL='${DMPDIR}/${RUN}.${YMD}/${HH}/atmos'
 fi
 declare -rx COM_OBS_TMPL='${ROTDIR}/${RUN}.${YMD}/${HH}/obs'
-declare -rx COM_OBSPROC_TMPL COM_RTOFS_TMPL
+declare -rx COM_OBSPROC_TMPL COM_RTOFS_TMPL COM_OBSFORGE_TMPL
 
 COM_BASE='${ROTDIR}/${RUN}.${YMD}/${HH}/${MEMDIR}'
 
 declare -rx COM_TOP_TMPL='${ROTDIR}/${RUN}.${YMD}/${HH}'
 
 declare -rx COM_CONF_TMPL=${COM_BASE}'/conf'
-declare -rx COM_OBS_JEDI=${COM_BASE}'/obs_jedi'
 
 declare -rx COM_ATMOS_INPUT_TMPL=${COM_BASE}'/model/atmos/input'
 declare -rx COM_ATMOS_RESTART_TMPL=${COM_BASE}'/model/atmos/restart'
@@ -110,5 +113,7 @@ declare -rx COM_CHEM_HISTORY_TMPL=${COM_BASE}'/model/chem/history'
 declare -rx COM_CHEM_ANALYSIS_TMPL=${COM_BASE}'/analysis/chem'
 declare -rx COM_CHEM_BMAT_TMPL=${COM_CHEM_ANALYSIS_TMPL}'/bmatrix'
 declare -rx COM_CHEM_ANLMON_TMPL=${COM_BASE}'/products/chem/anlmon'
+declare -rx COM_CHEM_INPUT_TMPL=${COM_BASE}'/model/chem/input'
+declare -rx COM_CHEM_RESTART_TMPL=${COM_BASE}'/model/chem/restart'
 
 declare -rx COM_MED_RESTART_TMPL=${COM_BASE}'/model/med/restart'

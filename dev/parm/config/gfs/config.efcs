@@ -70,9 +70,9 @@ export SPPT_LOGIT=".true."
 export SPPT_SFCLIMIT=".true."
 
 if [[ "${QUILTING}" == ".true." ]] && [[ "${OUTPUT_GRID}" == "gaussian_grid" ]]; then
-    export DIAG_TABLE="${PARMgfs}/ufs/fv3/diag_table_da"
+    export DIAG_TABLE="${PARMglobal}/ufs/fv3/diag_table_da"
 else
-    export DIAG_TABLE="${PARMgfs}/ufs/fv3/diag_table_da_orig"
+    export DIAG_TABLE="${PARMglobal}/ufs/fv3/diag_table_da_orig"
 fi
 
 # Model config option for Ensemble
@@ -88,11 +88,6 @@ export ICO2=2
 export dspheat=".true."
 export shal_cnv=".true."
 export FHZERO=6
-
-# Set PREFIX_ATMINC to r when recentering on
-if [[ ${RECENTER_ENKF:-"YES"} == "YES" ]]; then
-   export PREFIX_ATMINC="r"
-fi
 
 # Set restart interval to enable restarting forecasts after failures
 export restart_interval=${restart_interval_enkfgdas:-6}

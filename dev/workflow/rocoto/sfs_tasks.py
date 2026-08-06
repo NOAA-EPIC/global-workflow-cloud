@@ -16,7 +16,7 @@ class SFSTasks(Tasks):
                      'resources': resources,
                      'envars': self.envars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/stage_ic.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/stage_ic.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -33,7 +33,7 @@ class SFSTasks(Tasks):
                      'resources': resources,
                      'envars': self.envars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/waveinit.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/waveinit.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -50,7 +50,7 @@ class SFSTasks(Tasks):
                      'resources': resources,
                      'envars': self.envars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/prep_emissions.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/prep_emissions.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -88,7 +88,7 @@ class SFSTasks(Tasks):
                      'dependency': dependencies,
                      'envars': fcst_vars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/fcst.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/fcst.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -145,7 +145,7 @@ class SFSTasks(Tasks):
                          'dependency': dependencies,
                          'envars': efcsenvars,
                          'cycledef': self.run,
-                         'command': f'{self.HOMEgfs}/dev/jobs/fcst.sh',
+                         'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/fcst.sh',
                          'job_name': f'{self.pslot}_{task_name}_@H',
                          'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                          'maxtries': '&MAXTRIES;'
@@ -190,7 +190,7 @@ class SFSTasks(Tasks):
         fhout_ice_gfs = self._configs['base']['FHOUT_ICE_GFS']
         products_dict = {'atmos': {'config': 'atmos_products',
                                    'history_path_tmpl': 'COM_ATMOS_MASTER_TMPL',
-                                   'history_file_tmpl': f'{self.run}.t@Hz.master.grb2f#fhr3_last#'},
+                                   'history_file_tmpl': f'{self.run}.t@Hz.master.f#fhr3_last#.grib2'},
                          'ocean': {'config': 'oceanice_products',
                                    'history_path_tmpl': 'COM_OCEAN_HISTORY_TMPL',
                                    'history_file_tmpl': f'{self.run}.ocean.t@Hz.{fhout_ocn_gfs}hr_avg.f#fhr3_next#.nc'},
@@ -207,11 +207,6 @@ class SFSTasks(Tasks):
         resources = self.get_resource(config)
 
         fhrs = self._get_forecast_hours(self.run, self._configs[config], component)
-
-        # when replaying, atmos component does not have fhr 0, therefore remove 0 from fhrs
-        is_replay = self._configs[config]['REPLAY_ICS']
-        if is_replay and component in ['atmos'] and 0 in fhrs:
-            fhrs.remove(0)
 
         # ocean/ice components do not have fhr 0 as they are averaged output
         if component in ['ocean', 'ice'] and 0 in fhrs:
@@ -246,7 +241,7 @@ class SFSTasks(Tasks):
                      'dependency': dependencies,
                      'envars': postenvars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/{config}.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/{config}.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'}
@@ -278,11 +273,6 @@ class SFSTasks(Tasks):
 
         fhrs = self._get_forecast_hours(self.run, self._configs['atmos_ensstat'])
 
-        # when replaying, atmos component does not have fhr 0, therefore remove 0 from fhrs
-        is_replay = self._configs['atmos_ensstat']['REPLAY_ICS']
-        if is_replay and 0 in fhrs:
-            fhrs.remove(0)
-
         max_tasks = self._configs['atmos_ensstat']['MAX_TASKS']
         fhr_var_dict = self.get_grouped_fhr_dict(fhrs=fhrs, ngroups=max_tasks)
 
@@ -301,7 +291,7 @@ class SFSTasks(Tasks):
                      'dependency': dependencies,
                      'envars': postenvars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/atmos_ensstat.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/atmos_ensstat.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'}
@@ -327,11 +317,6 @@ class SFSTasks(Tasks):
 
         fhrs = self._get_forecast_hours(self.run, self._configs['wavepostsbs'], 'wave')
 
-        # When using replay, output does not start until hour 3
-        is_replay = self._configs['wavepostsbs']['REPLAY_ICS']
-        if is_replay:
-            fhrs = [fhr for fhr in fhrs if fhr not in [0, 1, 2]]
-
         max_tasks = self._configs['wavepostsbs']['MAX_TASKS']
         fhr_var_dict = self.get_grouped_fhr_dict(fhrs=fhrs, ngroups=max_tasks)
 
@@ -355,7 +340,7 @@ class SFSTasks(Tasks):
                      'dependency': dependencies,
                      'envars': wave_post_envars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/wavepostsbs.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/wavepostsbs.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -394,7 +379,7 @@ class SFSTasks(Tasks):
                      'dependency': dependencies,
                      'envars': wave_post_bndpnt_envars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/wavepostbndpnt.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/wavepostbndpnt.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -439,7 +424,7 @@ class SFSTasks(Tasks):
                      'dependency': dependencies,
                      'envars': wave_post_bndpnt_bull_envars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/wavepostbndpntbll.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/wavepostbndpntbll.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -478,7 +463,7 @@ class SFSTasks(Tasks):
                      'dependency': dependencies,
                      'envars': wave_post_pnt_envars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/wavepostpnt.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/wavepostpnt.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -523,7 +508,7 @@ class SFSTasks(Tasks):
                      'dependency': dependencies,
                      'envars': extractvars_envars,
                      'cycledef': self.run,
-                     'command': f'{self.HOMEgfs}/dev/jobs/extractvars.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/extractvars.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -573,7 +558,7 @@ class SFSTasks(Tasks):
                      'envars': self.envars,
                      'cycledef': self.run,
                      'dependency': dependencies,
-                     'command': f'{self.HOMEgfs}/dev/jobs/arch_vrfy.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/arch_vrfy.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -617,7 +602,31 @@ class SFSTasks(Tasks):
                      'envars': self.envars,
                      'cycledef': self.run,
                      'dependency': dependencies,
-                     'command': f'{self.HOMEgfs}/dev/jobs/arch_tars.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/arch_tars.sh',
+                     'job_name': f'{self.pslot}_{task_name}_@H',
+                     'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
+                     'maxtries': '&MAXTRIES;'
+                     }
+
+        task = rocoto.create_task(task_dict)
+
+        return task
+
+    # Globus transfer for HPSS archiving
+    def globus(self):
+        deps = []
+        dep_dict = {'type': 'task', 'name': f'{self.run}_arch_tars'}
+        deps.append(rocoto.add_dependency(dep_dict))
+        dependencies = rocoto.create_dependency(dep=deps)
+
+        resources = self.get_resource('globus')
+        task_name = f'{self.run}_globus_arch'
+        task_dict = {'task_name': task_name,
+                     'resources': resources,
+                     'dependency': dependencies,
+                     'envars': self.envars,
+                     'cycledef': self.run,
+                     'command': f'{self.HOMEglobal}/dev/jobs/globus_arch.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'
@@ -652,6 +661,13 @@ class SFSTasks(Tasks):
         if self.options['do_extractvars']:
             dep_dict = {'type': 'metatask', 'name': f'{self.run}_extractvars'}
             deps.append(rocoto.add_dependency(dep_dict))
+        if self.options['do_archcom']:
+            if self.options['do_globusarch']:
+                dep_dict = {'type': 'task', 'name': f'{self.run}_globus_arch'}
+            else:
+                dep_dict = {'type': 'task', 'name': f'{self.run}_arch_tars'}
+            deps.append(rocoto.add_dependency(dep_dict))
+            dependencies = rocoto.create_dependency(dep=deps)
         dependencies = rocoto.create_dependency(dep=deps, dep_condition='and')
         resources = self.get_resource('cleanup')
         task_name = f'{self.run}_cleanup'
@@ -660,7 +676,7 @@ class SFSTasks(Tasks):
                      'envars': self.envars,
                      'cycledef': self.run,
                      'dependency': dependencies,
-                     'command': f'{self.HOMEgfs}/dev/jobs/cleanup.sh',
+                     'command': f'{self.HOMEglobal}/dev/job_cards/rocoto/cleanup.sh',
                      'job_name': f'{self.pslot}_{task_name}_@H',
                      'log': f'{self.rotdir}/logs/@Y@m@d@H/{task_name}.log',
                      'maxtries': '&MAXTRIES;'

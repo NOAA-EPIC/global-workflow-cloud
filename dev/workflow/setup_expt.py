@@ -84,7 +84,7 @@ def update_configs(host, inputs):
 
     # Combine host.info and inputs_dict into a single dict, add some additional keys
     host_plus_inputs_dict = AttrDict(host.info, **inputs_dict_remapped)
-    host_plus_inputs_dict.HOMEgfs = _top
+    host_plus_inputs_dict.HOMEglobal = _top
     host_plus_inputs_dict.MACHINE = str(host).upper()
 
     # Read in the YAML file
@@ -244,7 +244,7 @@ def input_args(*argv):
         parser.add_argument('--interval', help='frequency of forecast (in hours); must be a multiple of 6 or 0 for no forecasts',
                             type=_validate_interval, required=False, default=6)
         parser.add_argument('--icsdir', help='full path to user initial condition directory', type=str, required=False, default='')
-        parser.add_argument('--gefstype', help='type of the gefs experiment: near-real-time or gefs-offline', type=str, required=False, default='')
+        parser.add_argument('--gefstype', help='type of the gefs experiment: gefs-real-time or gefs-offline', type=str, required=False, default='')
         parser.add_argument('--overwrite', help='overwrite previously created experiment (if it exists)',
                             action='store_true', required=False)
         return parser

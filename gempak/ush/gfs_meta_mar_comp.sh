@@ -5,22 +5,28 @@
 # Set up Local Variables
 #
 
-source "${HOMEgfs}/ush/preamble.sh"
-
 rm -Rf "${DATA}/GEMPAK_META_MAR"
 mkdir -p -m 775 "${DATA}/GEMPAK_META_MAR" "${DATA}/MAR_COMP"
 
 cd "${DATA}/MAR_COMP" || exit 2
-cpreq "${HOMEgfs}/gempak/fix/datatype.tbl" datatype.tbl
+cpreq "${HOMEglobal}/gempak/fix/datatype.tbl" datatype.tbl
 
 export COMIN="gfs.multi"
 mkdir -p "${COMIN}"
 for cycle in $(seq -f "%02g" -s ' ' 0 "${INTERVAL_GFS}" "${cyc}"); do
-    YMD=${PDY} HH=${cycle} GRID="1p00" declare_from_tmpl gempak_dir:COM_ATMOS_GEMPAK_TMPL
+    gempak_dir="${ROTDIR}/${RUN}.${PDY}/${cycle}/products/atmos/gempak/1p00"
     for file_in in "${gempak_dir}/gfs_1p00_${PDY}${cycle}f"*; do
-        file_out="${COMIN}/$(basename "${file_in}")"
-        if [[ ! -L "${file_out}" ]]; then
-            ${NLN} "${file_in}" "${file_out}"
+        # Only copy the file if it exists (it will not if we start on 6, 12, or 18z)
+        if [[ ! -f "${file_in}" ]]; then
+            echo "WARNING: ${file_in} does not exist, skipping"
+        else
+            file_out="${COMIN}/$(basename "${file_in}")"
+            # Only create new files, do not overwrite existing
+            if [[ ! -f "${file_out}" ]]; then
+                cpreq "${file_in}" "${file_out}"
+            else
+                echo "WARNING: ${file_out} already exists, skipping"
+            fi
         fi
     done
 done
@@ -30,9 +36,8 @@ done
 # TODO: Replace this
 #
 export HPCNAM="nam.${PDY}"
-if [[ ! -L ${HPCNAM} ]]; then
-    ${NLN} "${COMINnam}/nam.${PDY}/gempak" "${HPCNAM}"
-fi
+# TODO: remove live links and refer https://github.com/NOAA-EMC/global-workflow/issues/4406
+${NLN} "${COMINnam}/nam.${PDY}/gempak" "${HPCNAM}"
 
 mdl=gfs
 MDL="GFS"
@@ -56,6 +61,7 @@ for garea in NAtl NPac; do
         *)
             echo "FATAL ERROR: Unknown domain"
             exit 100
+            ;;
     esac
 
     offsets=(6 12)
@@ -64,9 +70,9 @@ for garea in NAtl NPac; do
         init_PDY=${init_time:0:8}
         init_cyc=${init_time:8:2}
 
-        if (( init_time <= SDATE )); then
+        if [[ "${init_time}" -le "${SDATE}" ]]; then
             echo "Skipping generation for ${init_time} because it is before the experiment began"
-            if (( offset == "${offsets[0]}" )); then
+            if [[ "${offset}" -eq "${offsets[0]}" ]]; then
                 echo "First forecast time, no metafile produced"
                 exit 0
             fi
@@ -74,11 +80,12 @@ for garea in NAtl NPac; do
         fi
 
         # Create symlink in DATA to sidestep gempak path limits
+        # TODO: Add only necessary files and remove unneeded ones to minimize data volume
+        # TODO: remove live links and refer https://github.com/NOAA-EMC/global-workflow/issues/4406
         HPCGFS="${RUN}.${init_time}"
-        if [[ ! -L ${HPCGFS} ]]; then
-            YMD="${init_PDY}" HH="${init_cyc}" GRID="1p00" declare_from_tmpl source_dir:COM_ATMOS_GEMPAK_TMPL
-            ${NLN} "${source_dir}" "${HPCGFS}"
-        fi
+        rm -f "${HPCGFS}"
+        source_dir="${ROTDIR}/${RUN}.${init_PDY}/${init_cyc}/products/atmos/gempak/1p00"
+        ${NLN} "${source_dir}" "${HPCGFS}"
 
         case ${cyc} in
             00 | 12)
@@ -93,16 +100,17 @@ for garea in NAtl NPac; do
                 ;;
             *)
                 echo "FATAL ERROR: Invalid cycle ${cyc} passed to ${BASH_SOURCE[0]}"
+                ;;
         esac
 
         case ${cyc}_${init_cyc} in
-            00_*)   testgfsfhr=114;;
-            06_00)  testgfsfhr=84;;
-            06_18)  testgfsfhr=72;;
-            12_00)  testgfsfhr=114;;
-            12_06)  testgfsfhr=78;;
-            18_06)  testgfsfhr=72;;
-            18_12)  testgfsfhr=84;;
+            00_*) testgfsfhr=114 ;;
+            06_00) testgfsfhr=84 ;;
+            06_18) testgfsfhr=72 ;;
+            12_00) testgfsfhr=114 ;;
+            12_06) testgfsfhr=78 ;;
+            18_06) testgfsfhr=72 ;;
+            18_12) testgfsfhr=84 ;;
             *)
                 echo "FATAL ERROR: Undefined pairing of cycles"
                 exit 200
@@ -120,7 +128,7 @@ for garea in NAtl NPac; do
             hilo2="5/H#;L#/1018-1060;900-1012/5/10;10/y!6/H#;L#/1018-1060;900-1012/5/10;10/y"
             title1="5/-2/~ ? ^ ${MDL} @ HGT (${cyc}Z YELLOW)|^${garea} ${cyc}Z vs ${init_cyc}Z 500 HGT!6/-3/~ ? ${MDL} @ HGT (${init_cyc}Z CYAN)"
             title2="5/-2/~ ? ^ ${MDL} PMSL (${cyc}Z YELLOW)|^${garea} ${cyc}Z vs ${init_cyc}Z PMSL!6/-3/~ ? ${MDL} PMSL (${init_cyc}Z CYAN)"
-            if (( fhr > testgfsfhr )); then
+            if [[ "${fhr}" -gt "${testgfsfhr}" ]]; then
                 grid2=" "
                 gfsoldfhr=" "
                 gdpfun1="sm5s(hght)"
@@ -132,7 +140,8 @@ for garea in NAtl NPac; do
                 title2="5/-2/~ ? ^ ${MDL} PMSL (${cyc}Z YELLOW)|^${garea} ${cyc}Z vs ${init_cyc}Z PMSL"
             fi
 
-            export pgm=gdplot2_nc;. prep_step
+            export pgm=gdplot2_nc
+            source prep_step
             "${GEMEXE}/gdplot2_nc" << EOF
 DEVICE  = ${device}
 MAP     = 1/1/1/yes
@@ -181,11 +190,12 @@ run
 
 ${ex}
 EOF
-            export err=$?;err_chk
+            export err=$?
+            err_chk
         done
     done
 
-    if (( 10#${cyc} % 12 ==0 )); then
+    if ((10#${cyc} % 12 == 0)); then
 
         #
         # There are some differences between 00z and 12z
@@ -222,6 +232,7 @@ EOF
 
         export HPCUKMET="ukmet.${ukmet_PDY}"
         if [[ ! -L "${HPCUKMET}" ]]; then
+            # TODO: remove live links and refer https://github.com/NOAA-EMC/global-workflow/issues/4406
             ${NLN} "${COMINukmet}/ukmet.${ukmet_PDY}/gempak" "${HPCUKMET}"
         fi
         grid2="F-UKMETHPC | ${ukmet_PDY:2}/${ukmet_date}"
@@ -230,7 +241,8 @@ EOF
             gfsfhr=F$(printf "%02g" "${fhr}")
             ukmetfhr=F$(printf "%02g" $((fhr + 12)))
 
-            export pgm=gdplot2_nc;. prep_step
+            export pgm=gdplot2_nc
+            source prep_step
             "${GEMEXE}/gdplot2_nc" << EOF
 DEVICE  = ${device}
 MAP     = 1/1/1/yes
@@ -298,27 +310,29 @@ l
 ${run_cmd}
 
 EOF
-            export err=$?;err_chk
+            export err=$?
+            err_chk
         done
 
         # COMPARE THE GFS MODEL TO THE 12 UTC ECMWF FROM YESTERDAY
-        offset=$(( (10#${cyc}+12)%24 + 12 ))
+        offset=$(((10#${cyc} + 12) % 24 + 12))
         ecmwf_date=$(date --utc +%Y%m%d%H -d "${PDY} ${cyc} - ${offset} hours")
         ecmwf_PDY=${ecmwf_date:0:8}
         # ecmwf_cyc=${ecmwf_date:8:2}
 
-
         HPCECMWF=ecmwf.${PDY}
         if [[ ! -L "${HPCECMWF}" ]]; then
+            # TODO: remove live links and refer https://github.com/NOAA-EMC/global-workflow/issues/4406
             ${NLN} "${COMINecmwf}/ecmwf.${ecmwf_PDY}/gempak" "${HPCECMWF}"
         fi
         grid2="${HPCECMWF}/ecmwf_glob_${ecmwf_date}"
 
-        for fhr in $(seq -s ' ' $(( offset%24 )) 24 120 ); do
+        for fhr in $(seq -s ' ' $((offset % 24)) 24 120); do
             gfsfhr=F$(printf "%02g" "${fhr}")
             ecmwffhr=F$(printf "%02g" $((fhr + 24)))
 
-            export pgm=gdplot2_nc;. prep_step
+            export pgm=gdplot2_nc
+            source prep_step
             "${GEMEXE}/gdplot2_nc" << EOF
 DEVICE  = ${device}
 MAP     = 1/1/1/yes
@@ -386,7 +400,8 @@ l
 run
 
 EOF
-            export err=$?;err_chk
+            export err=$?
+            err_chk
         done
 
         # COMPARE THE GFS MODEL TO THE NAM and NGM
@@ -462,7 +477,8 @@ l
 run
 
 EOF
-            export err=$?;err_chk
+            export err=$?
+            err_chk
         done
     fi
 done
@@ -472,13 +488,13 @@ done
 # WHEN IT CAN NOT PRODUCE THE DESIRED GRID.  CHECK
 # FOR THIS CASE HERE.
 #####################################################
-if (( err != 0 )) || [[ ! -s "${metaname}" ]] &> /dev/null; then
+if [[ "${err}" -ne 0 ]] || [[ ! -s "${metaname}" ]] &> /dev/null; then
     echo "FATAL ERROR: Failed to create gempak meta file ${metaname}"
-    exit $(( err + 100 ))
+    exit $((err + 100))
 fi
 
-mv "${metaname}" "${COMOUT_ATMOS_GEMPAK_META}/${mdl}_${PDY}_${cyc}_mar_comp"
-if [[ "${SENDDBN}" == "YES" ]] ; then
+cpfs "${metaname}" "${COMOUT_ATMOS_GEMPAK_META}/${mdl}_${PDY}_${cyc}_mar_comp"
+if [[ "${SENDDBN}" == "YES" ]]; then
     "${DBNROOT}/bin/dbn_alert MODEL" "${DBN_ALERT_TYPE}" "${job}" \
         "${COMOUT_ATMOS_GEMPAK_META}/${mdl}_${PDY}_${cyc}_mar_comp"
 fi
